@@ -1,0 +1,29 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <!-- Added to every project automatically -->
+  <ItemGroup>
+    <GlobalPackageReference Include="Meziantou.Analyzer" Version="3.0.342" />
+  </ItemGroup>
+
+  <!-- Aspire (local orchestration) -->
+  <ItemGroup>
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="17.0.0" />
+    <PackageVersion Include="Aspire.Hosting.Dotnet" Version="17.0.0" />
+    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="17.0.0" />
+    <PackageVersion Include="CommunityToolkit.Aspire.Hosting.MailPit" Version="17.0.0" />
+  </ItemGroup>
+
+  <!-- Service defaults: telemetry, health checks, service discovery -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.11.1" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.21.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.21.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.21.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.21.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.21.0" />
+  </ItemGroup>
+</Project>

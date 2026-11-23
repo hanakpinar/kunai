@@ -1,0 +1,53 @@
+version: 2
+
+updates:
+  # NuGet packages; versions live in Directory.Packages.props.
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Europe/Istanbul
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      aspire:
+        patterns: ["Aspire.*", "CommunityToolkit.Aspire.*"]
+      opentelemetry:
+        patterns: ["OpenTelemetry*"]
+    ignore:
+      # These follow the .NET major version; we move them together with the runtime.
+      - dependency-name: "Microsoft.Extensions.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.AspNetCore.*"
+        update-types: ["version-update:semver-major"]
+
+  # The SDK pinned in global.json; stay on .NET 10.
+  - package-ecosystem: dotnet-sdk
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Europe/Istanbul
+    commit-message:
+      prefix: "chore(sdk)"
+    ignore:
+      - dependency-name: "dotnet-sdk"
+        update-types: ["version-update:semver-major"]
+
+  # Versions of the actions used in .github/workflows.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Europe/Istanbul
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns: ["*"]

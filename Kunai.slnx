@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Kunai.Api/Kunai.Api.csproj" />
+    <Project Path="src/Kunai.AppHost/Kunai.AppHost.csproj" />
+    <Project Path="src/Kunai.ServiceDefaults/Kunai.ServiceDefaults.csproj" />
+  </Folder>
+</Solution>
