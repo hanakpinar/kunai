@@ -15,6 +15,9 @@ public class Result
     public bool IsSuccess => Error is null;
 
     public static implicit operator Result(Error error) => new(error);
+
+    /// <summary>Wraps a value explicitly; needed for interface types, which have no implicit conversion.</summary>
+    public static Result<T> Ok<T>(T value) => new(value);
 }
 
 /// <summary>The outcome of an operation that returns a value on success.</summary>
@@ -22,7 +25,7 @@ public sealed class Result<T> : Result
 {
     private readonly T? _value;
 
-    private Result(T value)
+    internal Result(T value)
         : base(null) => _value = value;
 
     private Result(Error error)

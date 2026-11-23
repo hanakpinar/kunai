@@ -338,6 +338,95 @@ namespace Kunai.Api.Persistence.Migrations
                     b.ToTable("user_sessions", (string)null);
                 });
 
+            modelBuilder.Entity("Kunai.Api.Features.Library.ShelfEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateOnly?>("FinishedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("finished_on");
+
+                    b.Property<bool>("IsFavorite")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_favorite");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("item_id");
+
+                    b.Property<int?>("Progress")
+                        .HasColumnType("integer")
+                        .HasColumnName("progress");
+
+                    b.Property<int?>("Rating")
+                        .HasColumnType("integer")
+                        .HasColumnName("rating");
+
+                    b.Property<string>("Review")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("review");
+
+                    b.Property<DateOnly?>("StartedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("started_on");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_shelf_entries");
+
+                    b.HasIndex("ItemId")
+                        .HasDatabaseName("ix_shelf_entries_item_id");
+
+                    b.HasIndex("UserId", "FinishedOn")
+                        .HasDatabaseName("ix_shelf_entries_user_id_finished_on")
+                        .HasFilter("finished_on IS NOT NULL");
+
+                    b.HasIndex("UserId", "ItemId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_shelf_entries_user_id_item_id");
+
+                    b.HasIndex("UserId", "Status")
+                        .HasDatabaseName("ix_shelf_entries_user_id_status");
+
+                    b.HasIndex("UserId", "UpdatedAt")
+                        .HasDatabaseName("ix_shelf_entries_user_id_updated_at");
+
+                    b.ToTable("shelf_entries", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_shelf_entries_dates", "started_on IS NULL OR finished_on IS NULL OR finished_on >= started_on");
+
+                            t.HasCheckConstraint("ck_shelf_entries_progress", "progress IS NULL OR progress >= 0");
+
+                            t.HasCheckConstraint("ck_shelf_entries_rating", "rating IS NULL OR rating BETWEEN 1 AND 10");
+                        });
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
                 {
                     b.Property<int>("Id")
@@ -667,6 +756,25 @@ namespace Kunai.Api.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_user_sessions_users_user_id");
+                });
+
+            modelBuilder.Entity("Kunai.Api.Features.Library.ShelfEntry", b =>
+                {
+                    b.HasOne("Kunai.Api.Features.Catalog.Items.Item", "Item")
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_shelf_entries_items_item_id");
+
+                    b.HasOne("Kunai.Api.Features.Identity.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_shelf_entries_users_user_id");
+
+                    b.Navigation("Item");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

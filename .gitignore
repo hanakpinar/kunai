@@ -481,3 +481,7 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 .DS_Store
+
+# Claude Code: local worktrees and personal settings
+.claude/worktrees/
+.claude/settings.local.json

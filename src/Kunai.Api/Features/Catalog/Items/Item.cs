@@ -11,6 +11,9 @@ public abstract class Item : IAuditable
     public const int TitleMaxLength = 500;
     public const int DescriptionMaxLength = 5000;
 
+    /// <param name="type">Set by each subclass, so the type is right before EF Core ever sees the item.</param>
+    protected Item(ItemType type) => Type = type;
+
     public Guid Id { get; init; } = Guid.CreateVersion7();
 
     public ItemType Type { get; private set; }

@@ -6,6 +6,7 @@ using Kunai.Api.Common.Http;
 using Kunai.Api.Common.OpenApi;
 using Kunai.Api.Features.Catalog;
 using Kunai.Api.Features.Identity;
+using Kunai.Api.Features.Library;
 using Kunai.Api.Features.Profiles;
 using Kunai.Api.Persistence;
 
@@ -55,5 +56,6 @@ var api = app.MapGroup("/api/v1");
 api.MapAuthEndpoints();
 api.MapMeEndpoints();
 api.MapCatalogEndpoints();
+api.MapLibraryEndpoints();
 
 await app.RunAsync();
