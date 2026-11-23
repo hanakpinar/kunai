@@ -7,8 +7,8 @@ If work stops midway, continue from the first unchecked step.
 |---|---|---|
 | 1 | Solution skeleton, quality gates, Aspire, CI | ✅ done |
 | 2 | API conventions (problem details, validation, OpenAPI + Scalar, rate limiting) and test projects | ✅ done |
-| 3 | Persistence (EF Core + PostgreSQL), registration, email confirmation | ⏳ next |
-| 4 | Sign-in, sessions, refresh tokens, logout (cookie for web, JWT for mobile) | ⬜ |
+| 3 | Persistence (EF Core + PostgreSQL), registration, email confirmation | ✅ done |
+| 4 | Sign-in, sessions, refresh tokens, logout (cookie for web, JWT for mobile) | ⏳ next |
 | 5 | Catalog model (6 item types) and the item-type registry endpoint | ⬜ |
 | 6 | Metadata providers (TMDB, Google Books + Open Library, IGDB, AniList), search and import | ⬜ |
 | 7 | Shelf endpoints | ⬜ |

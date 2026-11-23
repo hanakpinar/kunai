@@ -1,7 +1,11 @@
+using Kunai.Api.Common.Email;
 using Kunai.Api.IntegrationTests.Infrastructure;
 
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 using Testcontainers.PostgreSql;
 
@@ -18,6 +22,8 @@ public sealed class KunaiApiFactory : WebApplicationFactory<Program>, IAsyncLife
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18.6")
         .WithEnvironment("POSTGRES_INITDB_ARGS", "--encoding=UTF8 --locale=C.UTF-8")
         .Build();
+
+    public FakeEmailSender Emails { get; } = new();
 
     public async ValueTask InitializeAsync() => await _postgres.StartAsync(TestContext.Current.CancellationToken);
 
@@ -39,5 +45,12 @@ public sealed class KunaiApiFactory : WebApplicationFactory<Program>, IAsyncLife
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:kunaidb", _postgres.GetConnectionString());
         builder.UseSetting("RateLimiting:Enabled", "false");
+        builder.UseSetting("Security:PwnedPasswords:Enabled", "false");
+
+        builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<IEmailSender>();
+            services.AddSingleton<IEmailSender>(Emails);
+        });
     }
 }

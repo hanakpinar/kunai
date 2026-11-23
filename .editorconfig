@@ -412,3 +412,8 @@ MA0048.only_validate_first_type = true
 
 # Keyword clashes only matter for libraries consumed from other .NET languages.
 dotnet_diagnostic.CA1716.severity = none
+
+# EF Core migrations are generated code.
+[**/Migrations/**.cs]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none

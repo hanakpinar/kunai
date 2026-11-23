@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 
 using Kunai.Api.Common.Results;
 
@@ -22,6 +23,11 @@ public static class ProblemDetailsSetup
         var problem = context.ProblemDetails;
         var status = problem.Status ?? context.HttpContext.Response.StatusCode;
 
+        if (problem is HttpValidationProblemDetails validation)
+        {
+            CamelCaseErrorKeys(validation);
+        }
+
         if (!problem.Extensions.ContainsKey("code"))
         {
             problem.Extensions["code"] = problem is HttpValidationProblemDetails
@@ -31,6 +37,20 @@ public static class ProblemDetailsSetup
 
         problem.Extensions["traceId"] = Activity.Current?.Id ?? context.HttpContext.TraceIdentifier;
         problem.Instance ??= $"{context.HttpContext.Request.Method} {context.HttpContext.Request.Path}";
+    }
+
+    /// <summary>Built-in validation reports C# property names; clients see the camelCase JSON names.</summary>
+    private static void CamelCaseErrorKeys(HttpValidationProblemDetails validation)
+    {
+        var renamed = validation.Errors.ToDictionary(
+            pair => string.Join('.', pair.Key.Split('.').Select(JsonNamingPolicy.CamelCase.ConvertName)),
+            pair => pair.Value,
+            StringComparer.Ordinal);
+        validation.Errors.Clear();
+        foreach (var (key, value) in renamed)
+        {
+            validation.Errors[key] = value;
+        }
     }
 }
 
