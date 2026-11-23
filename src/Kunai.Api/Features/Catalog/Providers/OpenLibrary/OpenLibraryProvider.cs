@@ -78,7 +78,12 @@ internal sealed partial class OpenLibraryProvider(HttpClient http, IOptions<Open
             .OfType<string>()
             .Distinct(StringComparer.Ordinal)
             .Take(MaxAuthors);
-        var authors = await Task.WhenAll(authorIds.Select(id => SendAsync<Author>($"authors/{id}.json", cancellationToken)));
+        var authorsTask = Task.WhenAll(authorIds.Select(id => SendAsync<Author>($"authors/{id}.json", cancellationToken)));
+
+        // Work records rarely carry a publish date; the search index has the first publication year and a page count.
+        var year = YearOf(work.FirstPublishDate);
+        var indexed = await IndexedAsync(reference.Id, cancellationToken);
+        var authors = await authorsTask;
         if (authors.FirstOrDefault(a => !a.IsSuccess) is { Error: { } error })
         {
             return error;
@@ -89,12 +94,20 @@ internal sealed partial class OpenLibraryProvider(HttpClient http, IOptions<Open
             ItemType.Book,
             title,
             OriginalTitle: null,
-            YearOf(work.FirstPublishDate),
+            year ?? PlausibleYear(indexed?.FirstPublishYear),
             Description(work.Description),
             Cover((work.Covers ?? []).FirstOrDefault(id => id > 0)),
             Clean(authors.Select(a => a.Value?.Name ?? a.Value?.PersonalName)).ToList(),
             Clean(work.Subjects).Where(s => !IsMachineTag(s)).Take(MaxGenres).ToList(),
-            ProgressTotal: null);
+            indexed?.NumberOfPagesMedian is > 0 and < 100_000 ? indexed.NumberOfPagesMedian : null);
+    }
+
+    /// <summary>The work's search-index entry; null when the lookup fails, which never fails the import.</summary>
+    private async Task<SearchDoc?> IndexedAsync(string workId, CancellationToken cancellationToken)
+    {
+        var query = Uri.EscapeDataString($"key:\"/works/{workId}\"");
+        var response = await SendAsync<SearchResponse>($"search.json?q={query}&limit=1&fields=key,first_publish_year,number_of_pages_median", cancellationToken);
+        return response is { IsSuccess: true, Value.Docs: [var doc, ..] } ? doc : null;
     }
 
     private SearchHit? ToHit(SearchDoc doc)

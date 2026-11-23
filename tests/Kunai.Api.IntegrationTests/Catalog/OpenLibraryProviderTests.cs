@@ -169,6 +169,27 @@ public sealed class OpenLibraryProviderTests(KunaiApiFactory factory)
         response.Headers.RetryAfter!.Delta.Should().Be(TimeSpan.FromSeconds(30));
     }
 
+    [Fact]
+    public async Task Import_takes_the_year_and_page_count_from_the_search_index_when_the_work_has_no_date()
+    {
+        var workId = NewWorkId();
+        factory.Providers.Given(Request.Create().WithPath($"/olib/works/{workId}.json").UsingGet())
+            .RespondWith(Response.Create().WithBodyAsJson(new { key = $"/works/{workId}", title = "Dune" }));
+        factory.Providers.Given(Request.Create().WithPath("/olib/search.json").WithParam("q", $"key:\"/works/{workId}\"").UsingGet())
+            .RespondWith(Response.Create().WithBodyAsJson(new
+            {
+                numFound = 1,
+                docs = new[] { new { key = $"/works/{workId}", first_publish_year = 1965, number_of_pages_median = 604 } },
+            }));
+        var client = await factory.CreateSignedInClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/items/import", new { @ref = $"olib:work:{workId}" }, Ct);
+
+        var item = await response.Content.ReadFromJsonAsync<JsonElement>(Ct);
+        item.GetProperty("year").GetInt32().Should().Be(1965);
+        item.GetProperty("progressTotal").GetInt32().Should().Be(604);
+    }
+
     private static string NewWorkId() => $"OL{Random.Shared.Next(1_000_000, 90_000_000)}W";
 
     /// <summary>Google Books is searched before Open Library; make it fail for this query so the fallback answers.</summary>

@@ -18,7 +18,8 @@ internal static class OpenLibraryModels
         string? Title,
         IReadOnlyList<string>? AuthorName,
         int? FirstPublishYear,
-        long? CoverI);
+        long? CoverI,
+        int? NumberOfPagesMedian = null);
 
     /// <summary>
     /// The description is either a string or {"type": "/type/text", "value": "..."}; a cover id of -1 marks a
