@@ -406,3 +406,9 @@ dotnet_diagnostic.CA2016.severity = error
 # ASP.NET Core has no SynchronizationContext, so ConfigureAwait(false) is noise.
 dotnet_diagnostic.MA0004.severity = none
 
+
+# One main type per file; small companion types (request/response records) may follow it.
+MA0048.only_validate_first_type = true
+
+# Keyword clashes only matter for libraries consumed from other .NET languages.
+dotnet_diagnostic.CA1716.severity = none

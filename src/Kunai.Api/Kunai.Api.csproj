@@ -1,5 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
+  <PropertyGroup>
+    <!-- XML comments feed the OpenAPI document; undocumented members are allowed. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <UserSecretsId>kunai-api</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Kunai.Api.UnitTests" />
+    <InternalsVisibleTo Include="Kunai.Api.IntegrationTests" />
+    <InternalsVisibleTo Include="Kunai.ArchitectureTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Scalar.AspNetCore" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="../Kunai.ServiceDefaults/Kunai.ServiceDefaults.csproj" />
   </ItemGroup>

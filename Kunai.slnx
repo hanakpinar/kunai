@@ -4,4 +4,9 @@
     <Project Path="src/Kunai.AppHost/Kunai.AppHost.csproj" />
     <Project Path="src/Kunai.ServiceDefaults/Kunai.ServiceDefaults.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Kunai.Api.IntegrationTests/Kunai.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Kunai.Api.UnitTests/Kunai.Api.UnitTests.csproj" />
+    <Project Path="tests/Kunai.ArchitectureTests/Kunai.ArchitectureTests.csproj" />
+  </Folder>
 </Solution>

@@ -1,0 +1,14 @@
+[*.cs]
+
+# Test names read as sentences: Register_returns_201_for_a_new_user.
+dotnet_diagnostic.CA1707.severity = none
+
+# Test classes are instantiated by xUnit through reflection.
+dotnet_diagnostic.CA1812.severity = none
+dotnet_diagnostic.CA1515.severity = none
+
+# Literal URLs and strings are normal in tests.
+dotnet_diagnostic.CA1054.severity = none
+dotnet_diagnostic.CA1056.severity = none
+dotnet_diagnostic.CA2234.severity = none
+dotnet_diagnostic.CA1861.severity = none

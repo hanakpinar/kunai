@@ -23,6 +23,12 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "Microsoft.AspNetCore.*"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.EntityFrameworkCore*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Npgsql*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "EFCore.NamingConventions"
+        update-types: ["version-update:semver-major"]
 
   # The SDK pinned in global.json; stay on .NET 10.
   - package-ecosystem: dotnet-sdk

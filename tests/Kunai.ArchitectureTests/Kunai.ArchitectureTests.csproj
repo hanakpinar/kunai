@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="TngTech.ArchUnitNET" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Kunai.Api/Kunai.Api.csproj" />
+  </ItemGroup>
+
+</Project>
