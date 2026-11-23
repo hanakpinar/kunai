@@ -57,5 +57,6 @@ api.MapAuthEndpoints();
 api.MapMeEndpoints();
 api.MapCatalogEndpoints();
 api.MapLibraryEndpoints();
+api.MapUsersEndpoints();
 
 await app.RunAsync();

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 
+using Kunai.Api.Common.Caching;
 using Kunai.Api.Common.Http;
 using Kunai.Api.Common.Results;
 using Kunai.Api.Features.Catalog.Items;
@@ -8,6 +9,7 @@ using Kunai.Api.Persistence;
 
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Hybrid;
 
 using Npgsql;
 
@@ -35,6 +37,7 @@ public static class UpsertShelfEntry
         ShelfEntryRequest request,
         ClaimsPrincipal principal,
         AppDbContext db,
+        HybridCache cache,
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
@@ -44,9 +47,13 @@ public static class UpsertShelfEntry
         var entry = await db.Set<ShelfEntry>().Include(e => e.Item)
             .SingleOrDefaultAsync(e => e.UserId == userId && e.ItemId == itemId, cancellationToken);
 
-        return entry is null
+        var result = entry is null
             ? await CreateAsync(itemId, userId, data, principal, db, httpContext, cancellationToken)
             : await ReplaceAsync(entry, data, db, httpContext, cancellationToken);
+
+        // Profile, stats and goals are derived from the shelf; recompute them on the next read.
+        await cache.RemoveByTagAsync(CacheTags.User(userId), cancellationToken);
+        return result;
     }
 
     private static async Task<Results<Created<ShelfEntryResponse>, Ok<ShelfEntryResponse>, ProblemHttpResult>> CreateAsync(

@@ -427,6 +427,34 @@ namespace Kunai.Api.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Kunai.Api.Features.Profiles.Goals.UserGoal", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer")
+                        .HasColumnName("year");
+
+                    b.Property<string>("Type")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("type");
+
+                    b.Property<int>("Target")
+                        .HasColumnType("integer")
+                        .HasColumnName("target");
+
+                    b.HasKey("UserId", "Year", "Type")
+                        .HasName("pk_user_goals");
+
+                    b.ToTable("user_goals", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_user_goals_target", "target BETWEEN 1 AND 10000");
+                        });
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
                 {
                     b.Property<int>("Id")
@@ -775,6 +803,16 @@ namespace Kunai.Api.Persistence.Migrations
                         .HasConstraintName("fk_shelf_entries_users_user_id");
 
                     b.Navigation("Item");
+                });
+
+            modelBuilder.Entity("Kunai.Api.Features.Profiles.Goals.UserGoal", b =>
+                {
+                    b.HasOne("Kunai.Api.Features.Identity.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_goals_users_user_id");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

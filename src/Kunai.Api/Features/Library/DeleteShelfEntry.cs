@@ -1,10 +1,12 @@
 using System.Security.Claims;
 
+using Kunai.Api.Common.Caching;
 using Kunai.Api.Features.Identity;
 using Kunai.Api.Persistence;
 
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Kunai.Api.Features.Library;
 
@@ -20,10 +22,12 @@ public static class DeleteShelfEntry
         Guid itemId,
         ClaimsPrincipal principal,
         AppDbContext db,
+        HybridCache cache,
         CancellationToken cancellationToken)
     {
         var userId = principal.GetUserId();
         await db.Set<ShelfEntry>().Where(e => e.UserId == userId && e.ItemId == itemId).ExecuteDeleteAsync(cancellationToken);
+        await cache.RemoveByTagAsync(CacheTags.User(userId), cancellationToken);
         return TypedResults.NoContent();
     }
 }

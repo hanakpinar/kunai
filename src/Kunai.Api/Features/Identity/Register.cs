@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 using Kunai.Api.Common.Http;
 using Kunai.Api.Common.Results;
+using Kunai.Api.Features.Profiles.Avatars;
 
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
@@ -46,9 +47,11 @@ public static class Register
             return TypedResults.Accepted((string?)null);
         }
 
+        var userId = Guid.CreateVersion7();
         var user = new AppUser
         {
-            Id = Guid.CreateVersion7(),
+            Id = userId,
+            AvatarId = AvatarRegistry.DefaultFor(userId),
             UserName = username,
             Email = email,
             DisplayName = string.IsNullOrWhiteSpace(request.DisplayName) ? username : request.DisplayName.Trim(),

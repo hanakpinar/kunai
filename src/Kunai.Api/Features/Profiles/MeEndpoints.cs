@@ -1,3 +1,5 @@
+using Kunai.Api.Features.Profiles.Goals;
+
 namespace Kunai.Api.Features.Profiles;
 
 public static class MeEndpoints
@@ -8,6 +10,8 @@ public static class MeEndpoints
         var me = api.MapGroup("/me").WithTags("Me");
 
         GetMe.Map(me);
+        UpdateMe.Map(me);
+        GoalsEndpoints.MapMine(me);
 
         return api;
     }
