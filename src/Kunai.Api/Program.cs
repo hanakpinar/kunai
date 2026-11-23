@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using Kunai.Api.Common.Email;
 using Kunai.Api.Common.Http;
 using Kunai.Api.Common.OpenApi;
+using Kunai.Api.Features.Catalog;
 using Kunai.Api.Features.Identity;
 using Kunai.Api.Features.Profiles;
 using Kunai.Api.Persistence;
@@ -52,5 +53,6 @@ app.MapGet("/", () => "Kunai API").ExcludeFromDescription().AllowAnonymous();
 var api = app.MapGroup("/api/v1");
 api.MapAuthEndpoints();
 api.MapMeEndpoints();
+api.MapCatalogEndpoints();
 
 await app.RunAsync();

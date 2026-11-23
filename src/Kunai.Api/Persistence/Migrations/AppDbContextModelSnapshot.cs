@@ -22,6 +22,113 @@ namespace Kunai.Api.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Kunai.Api.Features.Catalog.Items.Item", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CatalogStatus")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("catalog_status");
+
+                    b.Property<string>("CoverUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("cover_url");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.PrimitiveCollection<string[]>("Creators")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("creators");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(5000)
+                        .HasColumnType("character varying(5000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("external_id");
+
+                    b.PrimitiveCollection<string[]>("Genres")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("genres");
+
+                    b.Property<DateTimeOffset?>("LastSyncedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_synced_at");
+
+                    b.Property<string>("OriginalTitle")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("original_title");
+
+                    b.Property<int?>("ProgressTotal")
+                        .HasColumnType("integer")
+                        .HasColumnName("progress_total");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("title");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("type");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int?>("Year")
+                        .HasColumnType("integer")
+                        .HasColumnName("year");
+
+                    b.HasKey("Id")
+                        .HasName("pk_items");
+
+                    b.HasIndex("Source", "ExternalId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_items_source_external_id");
+
+                    b.HasIndex("Type", "CatalogStatus")
+                        .HasDatabaseName("ix_items_type_catalog_status");
+
+                    b.ToTable("items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_items_progress_total", "progress_total IS NULL OR progress_total > 0");
+
+                            t.HasCheckConstraint("ck_items_year", "year IS NULL OR year BETWEEN 1000 AND 3000");
+                        });
+
+                    b.HasDiscriminator<string>("Type");
+
+                    b.UseTphMappingStrategy();
+                });
+
             modelBuilder.Entity("Kunai.Api.Features.Identity.AppUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -414,6 +521,130 @@ namespace Kunai.Api.Persistence.Migrations
                         .HasName("pk_user_tokens");
 
                     b.ToTable("user_tokens", (string)null);
+                });
+
+            modelBuilder.Entity("Kunai.Api.Features.Catalog.Items.Anime", b =>
+                {
+                    b.HasBaseType("Kunai.Api.Features.Catalog.Items.Item");
+
+                    b.Property<string>("Format")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("anime_format");
+
+                    b.ToTable("items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_items_progress_total", "progress_total IS NULL OR progress_total > 0");
+
+                            t.HasCheckConstraint("ck_items_year", "year IS NULL OR year BETWEEN 1000 AND 3000");
+                        });
+
+                    b.HasDiscriminator().HasValue("Anime");
+                });
+
+            modelBuilder.Entity("Kunai.Api.Features.Catalog.Items.Book", b =>
+                {
+                    b.HasBaseType("Kunai.Api.Features.Catalog.Items.Item");
+
+                    b.Property<string>("Isbn13")
+                        .HasMaxLength(13)
+                        .HasColumnType("character varying(13)")
+                        .HasColumnName("isbn13");
+
+                    b.Property<string>("Publisher")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("publisher");
+
+                    b.HasIndex("Isbn13")
+                        .HasDatabaseName("ix_items_isbn13");
+
+                    b.ToTable("items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_items_progress_total", "progress_total IS NULL OR progress_total > 0");
+
+                            t.HasCheckConstraint("ck_items_year", "year IS NULL OR year BETWEEN 1000 AND 3000");
+                        });
+
+                    b.HasDiscriminator().HasValue("Book");
+                });
+
+            modelBuilder.Entity("Kunai.Api.Features.Catalog.Items.Game", b =>
+                {
+                    b.HasBaseType("Kunai.Api.Features.Catalog.Items.Item");
+
+                    b.PrimitiveCollection<string[]>("Platforms")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("platforms");
+
+                    b.ToTable("items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_items_progress_total", "progress_total IS NULL OR progress_total > 0");
+
+                            t.HasCheckConstraint("ck_items_year", "year IS NULL OR year BETWEEN 1000 AND 3000");
+                        });
+
+                    b.HasDiscriminator().HasValue("Game");
+                });
+
+            modelBuilder.Entity("Kunai.Api.Features.Catalog.Items.Manga", b =>
+                {
+                    b.HasBaseType("Kunai.Api.Features.Catalog.Items.Item");
+
+                    b.Property<string>("Format")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("manga_format");
+
+                    b.Property<int?>("VolumeCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("volume_count");
+
+                    b.ToTable("items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_items_progress_total", "progress_total IS NULL OR progress_total > 0");
+
+                            t.HasCheckConstraint("ck_items_year", "year IS NULL OR year BETWEEN 1000 AND 3000");
+                        });
+
+                    b.HasDiscriminator().HasValue("Manga");
+                });
+
+            modelBuilder.Entity("Kunai.Api.Features.Catalog.Items.Movie", b =>
+                {
+                    b.HasBaseType("Kunai.Api.Features.Catalog.Items.Item");
+
+                    b.Property<int?>("RuntimeMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("runtime_minutes");
+
+                    b.ToTable("items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_items_progress_total", "progress_total IS NULL OR progress_total > 0");
+
+                            t.HasCheckConstraint("ck_items_year", "year IS NULL OR year BETWEEN 1000 AND 3000");
+                        });
+
+                    b.HasDiscriminator().HasValue("Movie");
+                });
+
+            modelBuilder.Entity("Kunai.Api.Features.Catalog.Items.Series", b =>
+                {
+                    b.HasBaseType("Kunai.Api.Features.Catalog.Items.Item");
+
+                    b.Property<int?>("SeasonCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("season_count");
+
+                    b.ToTable("items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_items_progress_total", "progress_total IS NULL OR progress_total > 0");
+
+                            t.HasCheckConstraint("ck_items_year", "year IS NULL OR year BETWEEN 1000 AND 3000");
+                        });
+
+                    b.HasDiscriminator().HasValue("Series");
                 });
 
             modelBuilder.Entity("Kunai.Api.Features.Identity.Sessions.RefreshToken", b =>
