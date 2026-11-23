@@ -67,6 +67,7 @@ public sealed class KunaiApiFactory : WebApplicationFactory<Program>, IAsyncLife
         builder.UseSetting("Providers:Tmdb:BaseUrl", $"{providers}/tmdb/3/");
         builder.UseSetting("Providers:Tmdb:AccessToken", "test-token");
         builder.UseSetting("Providers:GoogleBooks:BaseUrl", $"{providers}/gbooks/v1/");
+        builder.UseSetting("Providers:GoogleBooks:ApiKey", "test-key");
         builder.UseSetting("Providers:OpenLibrary:BaseUrl", $"{providers}/olib/");
         builder.UseSetting("Providers:Igdb:BaseUrl", $"{providers}/igdb/v4/");
         builder.UseSetting("Providers:Igdb:TokenUrl", $"{providers}/twitch/oauth2/token");

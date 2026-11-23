@@ -23,13 +23,17 @@ public sealed class ClientRateLimitHandler(RateLimiter limiter) : DelegatingHand
 public static class ClientRateLimitExtensions
 {
     /// <summary>Adds a token-bucket limit of <paramref name="permitsPerMinute"/> calls, queueing a few callers.</summary>
-    public static IHttpClientBuilder AddProviderRateLimit(this IHttpClientBuilder builder, string key, int permitsPerMinute, int queueLimit = 10)
+    public static IHttpClientBuilder AddProviderRateLimit(this IHttpClientBuilder builder, string key, int permitsPerMinute, int queueLimit = 10) =>
+        builder.AddProviderRateLimit(key, Math.Max(1, permitsPerMinute / 6), TimeSpan.FromSeconds(10), queueLimit);
+
+    /// <summary>At most <paramref name="permits"/> calls per <paramref name="period"/>, with no larger bursts.</summary>
+    public static IHttpClientBuilder AddProviderRateLimit(this IHttpClientBuilder builder, string key, int permits, TimeSpan period, int queueLimit = 10)
     {
         builder.Services.AddKeyedSingleton<RateLimiter>(key, (_, _) => new TokenBucketRateLimiter(new TokenBucketRateLimiterOptions
         {
-            TokenLimit = Math.Max(1, permitsPerMinute / 6),
-            TokensPerPeriod = Math.Max(1, permitsPerMinute / 6),
-            ReplenishmentPeriod = TimeSpan.FromSeconds(10),
+            TokenLimit = permits,
+            TokensPerPeriod = permits,
+            ReplenishmentPeriod = period,
             QueueLimit = queueLimit,
             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
             AutoReplenishment = true,

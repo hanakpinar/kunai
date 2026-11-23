@@ -66,10 +66,14 @@ This starts PostgreSQL, pgAdmin, Mailpit and the API, applies migrations and pri
 
 ### Provider keys (optional locally)
 
-Search works for books (Google Books, Open Library) and anime/manga (AniList) without keys. Movies, series and games need keys; store them as user secrets of the API project:
+Search works for books (through Open Library) and anime/manga (AniList) without keys. Google Books (the primary book source), movies, series and games need keys; store them as user secrets of the API project:
 
 ```bash
 dotnet user-secrets set "Providers:Tmdb:AccessToken" "<TMDB API read access token>" --project src/Kunai.Api
+```
+
+```bash
+dotnet user-secrets set "Providers:GoogleBooks:ApiKey" "<Google Cloud API key>" --project src/Kunai.Api
 ```
 
 ```bash

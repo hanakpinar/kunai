@@ -48,6 +48,7 @@ internal sealed partial class AniListProvider(HttpClient http, ILogger<AniListPr
             episodes
             chapters
             volumes
+            isAdult
             studios(isMain: true) { nodes { name } }
             staff(perPage: 4, sort: RELEVANCE) { nodes { name { full } } }
           }
@@ -133,7 +134,8 @@ internal sealed partial class AniListProvider(HttpClient http, ILogger<AniListPr
             return Failed(body.Errors);
         }
 
-        if (body.Data.Media is not { } media || DisplayTitle(media.Title) is not { } title)
+        // Adult titles are excluded from search; a hand-made ref must not bring them into the shared catalog either.
+        if (body.Data.Media is not { IsAdult: not true } media || DisplayTitle(media.Title) is not { } title)
         {
             return ProviderErrors.NotFound(reference);
         }
@@ -236,7 +238,7 @@ internal sealed partial class AniListProvider(HttpClient http, ILogger<AniListPr
 
     private static string? Text(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    [GeneratedRegex(@"<br\s*/?>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 100)]
+    [GeneratedRegex(@"<br\s*/?>\r?\n?", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 100)]
     private static partial Regex LineBreak();
 
     [GeneratedRegex(@"</?[a-zA-Z][^>]*>", RegexOptions.None, matchTimeoutMilliseconds: 100)]

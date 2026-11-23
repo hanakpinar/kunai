@@ -34,9 +34,11 @@ internal sealed partial class OpenLibraryProvider(HttpClient http, IOptions<Open
 
     public async Task<Result<ProviderSearchPage>> SearchAsync(ItemType type, string query, int page, CancellationToken cancellationToken)
     {
+        // search.json rejects q shorter than 3 characters (and "the") with 422; the title field has no such check.
+        var field = query.Length < 3 || string.Equals(query, "the", StringComparison.OrdinalIgnoreCase) ? "title" : "q";
         var url = string.Create(
             CultureInfo.InvariantCulture,
-            $"search.json?q={Uri.EscapeDataString(query)}&page={page}&limit={PageSize}&fields={SearchFields}");
+            $"search.json?{field}={Uri.EscapeDataString(query)}&page={page}&limit={PageSize}&fields={SearchFields}");
         var response = await SendAsync<SearchResponse>(url, cancellationToken);
         if (!response.IsSuccess)
         {
@@ -184,7 +186,9 @@ internal sealed partial class OpenLibraryProvider(HttpClient http, IOptions<Open
     private static int? YearOf(string? date)
     {
         var match = date is { Length: <= 100 } ? FourDigits().Match(date) : Match.Empty;
-        return match.Success ? PlausibleYear(int.Parse(match.ValueSpan, NumberStyles.None, CultureInfo.InvariantCulture)) : null;
+        return match.Success && int.TryParse(match.ValueSpan, NumberStyles.None, CultureInfo.InvariantCulture, out var year)
+            ? PlausibleYear(year)
+            : null;
     }
 
     private static int? PlausibleYear(int? year) => year is >= 1000 and <= 2100 ? year : null;
@@ -229,6 +233,6 @@ internal sealed partial class OpenLibraryProvider(HttpClient http, IOptions<Open
     [GeneratedRegex(@"\n{3,}", RegexOptions.None, matchTimeoutMilliseconds: 100)]
     private static partial Regex BlankLines();
 
-    [GeneratedRegex(@"(?<!\d)\d{4}(?!\d)", RegexOptions.None, matchTimeoutMilliseconds: 100)]
+    [GeneratedRegex(@"(?<![0-9])[0-9]{4}(?![0-9])", RegexOptions.None, matchTimeoutMilliseconds: 100)]
     private static partial Regex FourDigits();
 }

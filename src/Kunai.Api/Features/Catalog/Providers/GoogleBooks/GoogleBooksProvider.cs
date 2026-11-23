@@ -18,12 +18,20 @@ internal sealed partial class GoogleBooksProvider(HttpClient http, IOptions<Goog
 
     public ItemSource Source => ItemSource.GoogleBooks;
 
+    /// <summary>Google's anonymous quota is zero, so without a key every call would fail.</summary>
+    private bool Configured => !string.IsNullOrWhiteSpace(Settings.ApiKey);
+
     private GoogleBooksOptions Settings => options.Value;
 
     public bool Supports(ItemType type) => type == ItemType.Book;
 
     public async Task<Result<ProviderSearchPage>> SearchAsync(ItemType type, string query, int page, CancellationToken cancellationToken)
     {
+        if (!Configured)
+        {
+            return ProviderErrors.NotConfigured(Source);
+        }
+
         var startIndex = (page - 1) * PageSize;
         var url = $"volumes?q={Uri.EscapeDataString(query)}&startIndex={startIndex.ToString(CultureInfo.InvariantCulture)}"
             + $"&maxResults={PageSize.ToString(CultureInfo.InvariantCulture)}&printType=books{KeyParameter('&')}";
@@ -60,6 +68,11 @@ internal sealed partial class GoogleBooksProvider(HttpClient http, IOptions<Goog
 
     public async Task<Result<ItemMetadata>> GetAsync(ExternalRef reference, CancellationToken cancellationToken)
     {
+        if (!Configured)
+        {
+            return ProviderErrors.NotConfigured(Source);
+        }
+
         if (!string.Equals(reference.Kind, VolumeKind, StringComparison.Ordinal) || !IsVolumeId(reference.Id))
         {
             return ProviderErrors.NotFound(reference);

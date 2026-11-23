@@ -128,11 +128,37 @@ public sealed class GoogleBooksProviderTests(KunaiApiFactory factory)
         var query = "outage " + Guid.NewGuid().ToString("N")[..6];
         factory.Providers.Given(Request.Create().WithPath("/gbooks/v1/volumes").WithParam("q", query).UsingGet())
             .RespondWith(Response.Create().WithStatusCode(503));
+        factory.Providers.Given(Request.Create().WithPath("/olib/search.json").WithParam("q", query).UsingGet())
+            .RespondWith(Response.Create().WithStatusCode(503));
 
         var response = await factory.CreateApiClient().GetAsync($"/api/v1/search?q={Uri.EscapeDataString(query)}&type=book", Ct);
 
         await ShouldBeProblem(response, HttpStatusCode.ServiceUnavailable, "provider_unavailable");
         response.Headers.RetryAfter!.Delta.Should().Be(TimeSpan.FromSeconds(30));
+    }
+
+    [Fact]
+    public async Task When_google_is_down_book_search_falls_back_to_open_library()
+    {
+        var query = "fallback " + Guid.NewGuid().ToString("N")[..6];
+        factory.Providers.Given(Request.Create().WithPath("/gbooks/v1/volumes").WithParam("q", query).UsingGet())
+            .RespondWith(Response.Create().WithStatusCode(429));
+        factory.Providers.Given(Request.Create().WithPath("/olib/search.json").WithParam("q", query).UsingGet())
+            .RespondWith(Response.Create().WithBodyAsJson(new
+            {
+                numFound = 1,
+                docs = new[] { new { key = "/works/OL45883W", title = "Dune", author_name = new[] { "Frank Herbert" }, first_publish_year = 1965 } },
+            }));
+
+        var body = await factory.CreateApiClient().GetFromJsonAsync<JsonElement>($"/api/v1/search?q={Uri.EscapeDataString(query)}&type=book", Ct);
+
+        body.GetProperty("items")[0].GetProperty("ref").GetString().Should().Be("olib:work:OL45883W");
+        factory.Providers.LogEntries
+            .Count(e => string.Equals(e.RequestMessage?.Path, "/gbooks/v1/volumes", StringComparison.Ordinal)
+                && e.RequestMessage?.Query is { } parameters
+                && parameters.TryGetValue("q", out var values)
+                && values.Contains(query, StringComparer.Ordinal))
+            .Should().Be(1, "a daily-quota 429 is not retried");
     }
 
     /// <summary>Google Books ids are 12 URL-safe characters.</summary>

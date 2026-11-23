@@ -10,12 +10,12 @@ If work stops midway, continue from the first unchecked step.
 | 3 | Persistence (EF Core + PostgreSQL), registration, email confirmation | ✅ done |
 | 4 | Sign-in, sessions, refresh tokens, logout (cookie for web, JWT for mobile) | ✅ done |
 | 5 | Catalog model (6 item types) and the item-type registry endpoint | ✅ done |
-| 6 | Metadata providers (TMDB, Google Books + Open Library, IGDB, AniList), search and import | ⏳ TMDB done; other providers on their own branches |
+| 6 | Metadata providers (TMDB, Google Books + Open Library, IGDB, AniList), search and import | ✅ done |
 | 7 | Shelf endpoints | ✅ done |
 | 8 | Profiles, settings, ninja avatars, stats, belts (ranks) and yearly goals (missions) | ✅ done |
 | 9 | Account lifecycle (password reset/change, account deletion) and manual book moderation | ✅ done |
-| 10 | Independent review and fixes | ⬜ |
-| 11 | Documentation (README, ADRs, error catalogue, mobile integration guide) | ⬜ |
+| 10 | Independent review and fixes | ⏳ in progress |
+| 11 | Documentation (README, ADRs, error catalogue, mobile integration guide) | ✅ done (kept current) |
 
 ## Deferred on purpose
 

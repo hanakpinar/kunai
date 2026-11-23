@@ -7,8 +7,8 @@ public sealed class GoogleBooksOptions
     public Uri BaseUrl { get; set; } = new("https://www.googleapis.com/books/v1/");
 
     /// <summary>
-    /// Optional Google Cloud API key. Requests work without it, but then share Google's anonymous daily
-    /// quota, which is often exhausted. Keep it in user-secrets.
+    /// Google Cloud API key, required in practice: the anonymous quota is zero. Without a key the provider
+    /// reports itself as not configured and book searches go straight to Open Library. Keep it in user-secrets.
     /// </summary>
     public string? ApiKey { get; set; }
 }

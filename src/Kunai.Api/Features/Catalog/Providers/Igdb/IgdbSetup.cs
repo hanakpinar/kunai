@@ -29,7 +29,7 @@ public static class IgdbSetup
             })
             .AddHttpMessageHandler<IgdbAuthHandler>()
             .AddProviderResilience(builder.Configuration)
-            .AddProviderRateLimit("igdb", permitsPerMinute: 240);
+            .AddProviderRateLimit("igdb", permits: 4, period: TimeSpan.FromSeconds(1));
 
         builder.Services.AddTransient<IMetadataProvider>(services => services.GetRequiredService<IgdbProvider>());
         return builder;

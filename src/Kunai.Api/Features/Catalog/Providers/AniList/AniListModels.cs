@@ -32,6 +32,7 @@ internal static class AniListModels
         int? Episodes,
         int? Chapters,
         int? Volumes,
+        bool? IsAdult,
         Connection<Studio>? Studios,
         Connection<Staff>? Staff);
 

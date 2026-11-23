@@ -17,7 +17,13 @@ public static class OpenLibrarySetup
                 // Open Library asks API clients to identify themselves.
                 client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Kunai", "1.0"));
             })
-            .AddProviderResilience(builder.Configuration)
+            .AddProviderResilience(builder.Configuration, options =>
+            {
+                // Open Library search regularly takes 3-7 seconds.
+                options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(10);
+                options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(25);
+                options.Retry.MaxRetryAttempts = 1;
+            })
             .AddProviderRateLimit("openlibrary", permitsPerMinute: 60);
 
         builder.Services.AddTransient<IMetadataProvider>(services => services.GetRequiredService<OpenLibraryProvider>());
