@@ -15,8 +15,18 @@ If work stops midway, continue from the first unchecked step.
 | 8 | Profiles, settings, ninja avatars, stats, belts (ranks) and yearly goals (missions) | ✅ done |
 | 9 | Account lifecycle (password reset/change, account deletion) and manual book moderation | ✅ done |
 | 10 | Independent review and fixes | ✅ done |
-| 11 | Documentation (README, ADRs, error catalogue, mobile integration guide) | ✅ done (kept current) |
+| 11 | Documentation (README, ADRs, error catalogue, client integration guide) | ✅ done |
+
+## Next
+
+| Step | Notes |
+|---|---|
+| Publish the repository on GitHub | CI and Dependabot start working once it is pushed |
+| Hosted environment | The container image is ready (`dotnet publish -t:PublishContainer`); needs a host (e.g. Azure Container Apps + Neon), a signing key, SMTP and a domain |
+| Metadata refresh job | Re-sync imported items periodically (TMDB asks for cached data to be refreshed) |
+| OpenAPI breaking-change check in CI | Commit the generated document and diff it on pull requests (oasdiff) |
+| Web app | Blazor Web App calling the API through a client generated from the OpenAPI document |
 
 ## Deferred on purpose
 
-Next Up queue, social features (follows, feed, reviews, lists), CSV imports, AI recommendations, image uploads, hosted deployment.
+Next Up queue, social features (follows, feed, reviews, lists), CSV imports (IMDb, Letterboxd, Goodreads), AI recommendations, image uploads, Google and Apple sign-in.
