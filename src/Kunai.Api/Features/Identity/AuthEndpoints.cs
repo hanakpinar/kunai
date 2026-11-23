@@ -10,6 +10,9 @@ public static class AuthEndpoints
         ConfirmEmail.Map(auth);
         ResendConfirmation.Map(auth);
         UsernameAvailability.Map(auth);
+        Login.Map(auth);
+        Refresh.Map(auth);
+        Logout.Map(auth);
 
         return api;
     }

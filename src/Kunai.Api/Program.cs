@@ -5,6 +5,7 @@ using Kunai.Api.Common.Email;
 using Kunai.Api.Common.Http;
 using Kunai.Api.Common.OpenApi;
 using Kunai.Api.Features.Identity;
+using Kunai.Api.Features.Profiles;
 using Kunai.Api.Persistence;
 
 using Scalar.AspNetCore;
@@ -28,6 +29,7 @@ builder.AddKunaiEmail();
 
 // Features
 builder.AddKunaiIdentity();
+builder.AddKunaiAuthentication();
 
 var app = builder.Build();
 
@@ -36,15 +38,19 @@ await app.MigrateDatabaseAsync();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseKunaiSecurityHeaders();
+app.UseAuthentication();
+app.UseKunaiCsrfProtection();
+app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapDefaultEndpoints();
-app.MapOpenApi();
-app.MapScalarApiReference("/docs", options => options.WithTitle("Kunai API"));
+app.MapOpenApi().AllowAnonymous();
+app.MapScalarApiReference("/docs", options => options.WithTitle("Kunai API")).AllowAnonymous();
 
-app.MapGet("/", () => "Kunai API").ExcludeFromDescription();
+app.MapGet("/", () => "Kunai API").ExcludeFromDescription().AllowAnonymous();
 
 var api = app.MapGroup("/api/v1");
 api.MapAuthEndpoints();
+api.MapMeEndpoints();
 
 await app.RunAsync();

@@ -12,6 +12,7 @@ public static class ResendConfirmation
     public static void Map(RouteGroupBuilder auth) =>
         auth.MapPost("/confirm-email/resend", HandleAsync)
             .WithName("ResendEmailConfirmation")
+            .AllowAnonymous()
             .WithSummary("Send the confirmation email again")
             .WithDescription("Always answers 202, so it cannot be used to find out which emails are registered.")
             .RequireRateLimiting(RateLimitPolicies.Auth)

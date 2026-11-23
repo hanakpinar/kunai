@@ -25,7 +25,13 @@ public sealed class KunaiApiFactory : WebApplicationFactory<Program>, IAsyncLife
 
     public FakeEmailSender Emails { get; } = new();
 
-    public async ValueTask InitializeAsync() => await _postgres.StartAsync(TestContext.Current.CancellationToken);
+    public async ValueTask InitializeAsync()
+    {
+        await _postgres.StartAsync(TestContext.Current.CancellationToken);
+
+        // Start the app (and run migrations) once, before tests create clients in parallel.
+        _ = Server;
+    }
 
     public override async ValueTask DisposeAsync()
     {

@@ -13,6 +13,7 @@ public static class Register
     public static void Map(RouteGroupBuilder auth) =>
         auth.MapPost("/register", HandleAsync)
             .WithName("Register")
+            .AllowAnonymous()
             .WithSummary("Create an account")
             .WithDescription("Always answers 202 for a valid request, even when the email already has an account; the confirmation link arrives by email.")
             .RequireRateLimiting(RateLimitPolicies.Auth)

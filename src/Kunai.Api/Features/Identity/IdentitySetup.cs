@@ -33,6 +33,7 @@ public static class IdentitySetup
             })
             .AddRoles<IdentityRole<Guid>>()
             .AddEntityFrameworkStores<AppDbContext>()
+            .AddSignInManager()
             .AddDefaultTokenProviders();
 
         var pwned = builder.Configuration.GetSection(PwnedPasswordsOptions.SectionName).Get<PwnedPasswordsOptions>()

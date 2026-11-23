@@ -7,6 +7,7 @@ public static class UsernameAvailability
     public static void Map(RouteGroupBuilder auth) =>
         auth.MapGet("/username-availability", HandleAsync)
             .WithName("GetUsernameAvailability")
+            .AllowAnonymous()
             .WithSummary("Check whether a username can be registered");
 
     internal static async Task<UsernameAvailabilityResponse> HandleAsync(string username, UserManager<AppUser> users)

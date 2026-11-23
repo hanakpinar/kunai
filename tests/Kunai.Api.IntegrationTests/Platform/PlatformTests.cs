@@ -22,9 +22,19 @@ public sealed class PlatformTests(KunaiApiFactory factory)
     }
 
     [Fact]
-    public async Task Unknown_route_returns_problem_details_with_code_and_trace_id()
+    public async Task Unknown_routes_answer_401_to_anonymous_callers_so_they_cannot_probe_the_api()
     {
         var response = await _client.GetAsync("/api/v1/does-not-exist", TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Unknown_route_returns_problem_details_with_code_and_trace_id()
+    {
+        var client = await factory.CreateSignedInClientAsync();
+
+        var response = await client.GetAsync("/api/v1/does-not-exist", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         response.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
@@ -41,6 +51,20 @@ public sealed class PlatformTests(KunaiApiFactory factory)
 
         document.GetProperty("openapi").GetString().Should().StartWith("3.1");
         document.GetProperty("info").GetProperty("title").GetString().Should().Be("Kunai API");
+    }
+
+    [Fact]
+    public async Task OpenApi_document_describes_both_sign_in_methods_on_protected_operations()
+    {
+        var document = await _client.GetFromJsonAsync<JsonElement>("/openapi/v1.json", TestContext.Current.CancellationToken);
+
+        var schemes = document.GetProperty("components").GetProperty("securitySchemes");
+        schemes.GetProperty("Bearer").GetProperty("scheme").GetString().Should().Be("bearer");
+        schemes.GetProperty("Cookie").GetProperty("name").GetString().Should().Be("__Host-kunai");
+
+        var paths = document.GetProperty("paths");
+        paths.GetProperty("/api/v1/me").GetProperty("get").TryGetProperty("security", out _).Should().BeTrue();
+        paths.GetProperty("/api/v1/auth/login").GetProperty("post").TryGetProperty("security", out _).Should().BeFalse();
     }
 
     [Fact]

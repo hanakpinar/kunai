@@ -13,6 +13,7 @@ public static class ConfirmEmail
     public static void Map(RouteGroupBuilder auth) =>
         auth.MapPost("/confirm-email", HandleAsync)
             .WithName("ConfirmEmail")
+            .AllowAnonymous()
             .WithSummary("Confirm an email address with the userId and token from the confirmation link")
             .RequireRateLimiting(RateLimitPolicies.Auth)
             .ProducesValidationProblem();

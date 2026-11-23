@@ -87,13 +87,13 @@ public static class Extensions
         // The default response is only "Healthy" or "Unhealthy"; no details are exposed.
 
         // Readiness: every registered check must pass before the app receives traffic.
-        app.MapHealthChecks(ReadinessPath);
+        app.MapHealthChecks(ReadinessPath).AllowAnonymous();
 
         // Liveness: only checks tagged "live" must pass.
         app.MapHealthChecks(LivenessPath, new HealthCheckOptions
         {
             Predicate = check => check.Tags.Contains("live"),
-        });
+        }).AllowAnonymous();
 
         return app;
     }
