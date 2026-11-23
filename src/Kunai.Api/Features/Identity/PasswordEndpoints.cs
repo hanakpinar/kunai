@@ -40,7 +40,7 @@ public static class PasswordEndpoints
     internal static async Task<Accepted> ForgotAsync(
         ForgotPasswordRequest request, UserManager<AppUser> users, IdentityEmails emails, CancellationToken cancellationToken)
     {
-        if (await users.FindByEmailAsync(request.Email!.Trim()) is { EmailConfirmed: true } user)
+        if (await users.FindByEmailAsync(request.Email!.Trim()) is { } user)
         {
             await emails.SendPasswordResetAsync(user, cancellationToken);
         }
@@ -61,7 +61,15 @@ public static class PasswordEndpoints
         var result = await users.ResetPasswordAsync(user, token, request.NewPassword!);
         if (!result.Succeeded)
         {
-            return IdentityErrors.From(result.Errors).ToProblem();
+            return IdentityErrors.From(result.Errors, "newPassword").ToProblem();
+        }
+
+        // The token reached the mailbox, so its owner is the one choosing the password: this also recovers
+        // accounts whose confirmation email never arrived, and evicts anyone who registered the address first.
+        if (!user.EmailConfirmed)
+        {
+            user.EmailConfirmed = true;
+            await users.UpdateAsync(user);
         }
 
         // Whoever knew the old password is signed out everywhere.
@@ -75,7 +83,9 @@ public static class PasswordEndpoints
         ChangePasswordRequest request,
         ClaimsPrincipal principal,
         UserManager<AppUser> users,
+        SignInManager<AppUser> signIn,
         SessionService sessions,
+        HttpContext httpContext,
         CancellationToken cancellationToken)
     {
         var user = await users.FindByIdAsync(principal.GetUserId().ToString());
@@ -89,10 +99,11 @@ public static class PasswordEndpoints
         {
             return result.Errors.Any(e => string.Equals(e.Code, nameof(IdentityErrorDescriber.PasswordMismatch), StringComparison.Ordinal))
                 ? Error.ValidationField("currentPassword", "password_mismatch", "The current password is wrong.").ToProblem()
-                : IdentityErrors.From(result.Errors).ToProblem();
+                : IdentityErrors.From(result.Errors, "newPassword").ToProblem();
         }
 
         await sessions.RevokeAllExceptAsync(user.Id, principal.GetSessionId(), cancellationToken);
+        await CookieRenewal.RenewIfCookieAsync(httpContext, principal, signIn, user);
         return TypedResults.NoContent();
     }
 }

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 
 using Kunai.Api.Common.Http;
+using Kunai.Api.Features.Identity;
 using Kunai.Api.Features.Library;
 using Kunai.Api.Persistence;
 
@@ -31,7 +32,8 @@ public static class GetUserShelf
             return ProfileLookup.NotFound.ToProblem();
         }
 
-        var page = await ShelfListQuery.RunAsync(db, user.Id, request, cancellationToken);
+        var isOwner = viewer.Identity?.IsAuthenticated == true && viewer.GetUserId() == user.Id;
+        var page = await ShelfListQuery.RunAsync(db, user.Id, request, includeUnreviewed: isOwner, cancellationToken);
         return page.IsSuccess ? TypedResults.Ok(page.Value) : page.Error.ToProblem();
     }
 }

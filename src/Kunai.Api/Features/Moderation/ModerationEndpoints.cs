@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 
+using Kunai.Api.Common.Caching;
 using Kunai.Api.Common.Http;
 using Kunai.Api.Common.Results;
 using Kunai.Api.Features.Catalog;
@@ -10,6 +11,7 @@ using Kunai.Api.Persistence;
 
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Kunai.Api.Features.Moderation;
 
@@ -24,17 +26,18 @@ public static partial class ModerationEndpoints
 
         admin.MapGet("/pending", GetPendingAsync)
             .WithName("GetPendingItems")
-            .WithSummary("Manually added items waiting for review, oldest first");
+            .WithSummary("Manually added items waiting for review, oldest first")
+            .ProducesValidationProblem();
 
-        admin.MapPost("/{id:guid}/approve", (Guid id, ClaimsPrincipal moderator, AppDbContext db, ILogger<PendingItem> logger, CancellationToken ct) =>
-                DecideAsync(id, CatalogStatus.Approved, moderator, db, logger, ct))
+        admin.MapPost("/{id:guid}/approve", (Guid id, ClaimsPrincipal moderator, AppDbContext db, HybridCache cache, TimeProvider time, ILogger<PendingItem> logger, CancellationToken ct) =>
+                DecideAsync(id, CatalogStatus.Approved, moderator, db, cache, time, logger, ct))
             .WithName("ApproveItem")
             .WithSummary("Make the item visible to everyone")
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
-        admin.MapPost("/{id:guid}/reject", (Guid id, ClaimsPrincipal moderator, AppDbContext db, ILogger<PendingItem> logger, CancellationToken ct) =>
-                DecideAsync(id, CatalogStatus.Rejected, moderator, db, logger, ct))
+        admin.MapPost("/{id:guid}/reject", (Guid id, ClaimsPrincipal moderator, AppDbContext db, HybridCache cache, TimeProvider time, ILogger<PendingItem> logger, CancellationToken ct) =>
+                DecideAsync(id, CatalogStatus.Rejected, moderator, db, cache, time, logger, ct))
             .WithName("RejectItem")
             .WithSummary("Keep the item hidden (it stays on its creator's shelf)")
             .ProducesProblem(StatusCodes.Status404NotFound)
@@ -61,23 +64,34 @@ public static partial class ModerationEndpoints
         CatalogStatus decision,
         ClaimsPrincipal moderator,
         AppDbContext db,
+        HybridCache cache,
+        TimeProvider time,
         ILogger logger,
         CancellationToken cancellationToken)
     {
-        var item = await db.Set<Item>().SingleOrDefaultAsync(i => i.Id == id, cancellationToken);
+        // Conditional update: of two moderators deciding at once, exactly one succeeds.
+        var now = time.GetUtcNow();
+        var changed = await db.Set<Item>()
+            .Where(i => i.Id == id && i.CatalogStatus == CatalogStatus.PendingReview)
+            .ExecuteUpdateAsync(set => set.SetProperty(i => i.CatalogStatus, decision).SetProperty(i => i.UpdatedAt, now), cancellationToken);
+
+        var item = await db.Set<Item>().AsNoTracking().SingleOrDefaultAsync(i => i.Id == id, cancellationToken);
         if (item is null)
         {
             return Error.NotFound(GetItem.NotFoundCode, "No such item.").ToProblem();
         }
 
-        if (item.CatalogStatus != CatalogStatus.PendingReview)
+        if (changed == 0)
         {
             return Error.Conflict(NotPending, $"The item is already {item.CatalogStatus}.").ToProblem();
         }
 
+        if (item.CreatedByUserId is { } creator)
+        {
+            await cache.RemoveByTagAsync(CacheTags.User(creator), cancellationToken);
+        }
+
         var moderatorId = moderator.GetUserId();
-        item.CatalogStatus = decision;
-        await db.SaveChangesAsync(cancellationToken);
         LogDecision(logger, moderatorId, decision, id);
         return TypedResults.NoContent();
     }

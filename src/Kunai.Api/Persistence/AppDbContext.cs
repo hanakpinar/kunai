@@ -37,6 +37,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             user.Property(u => u.AvatarId).HasMaxLength(32);
             user.Property(u => u.Locale).HasMaxLength(8);
             user.Property(u => u.TimeZone).HasMaxLength(64);
+
+            // Identity checks for duplicates in code; the index stops two parallel registrations.
+            user.HasIndex(u => u.NormalizedEmail).HasDatabaseName("EmailIndex").IsUnique();
         });
 
         builder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);

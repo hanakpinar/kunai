@@ -9,7 +9,12 @@ public static class IdentitySetup
 {
     public static IHostApplicationBuilder AddKunaiIdentity(this IHostApplicationBuilder builder)
     {
-        builder.Services.AddOptions<AppOptions>().Bind(builder.Configuration.GetSection(AppOptions.SectionName));
+        builder.Services.AddOptions<AppOptions>()
+            .Bind(builder.Configuration.GetSection(AppOptions.SectionName))
+            .Validate(
+                options => string.Equals(options.WebBaseUrl.Scheme, "https", StringComparison.Ordinal) || builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing"),
+                "App:WebBaseUrl must be an https URL outside Development; email links point there.")
+            .ValidateOnStart();
 
         builder.Services
             .AddIdentityCore<AppUser>(options =>

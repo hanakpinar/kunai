@@ -20,6 +20,7 @@ public static class AddManualBook
     public const int DailyLimit = 10;
     public const string LimitReached = "manual_item_limit";
     public const string BookExists = "book_exists";
+    public const string BookPendingReview = "book_pending_review";
 
     public static void Map(IEndpointRouteBuilder api) =>
         api.MapPost("/items", HandleAsync)
@@ -45,16 +46,13 @@ public static class AddManualBook
             return Error.BusinessRule(LimitReached, $"You can add at most {DailyLimit} books a day.").ToProblem();
         }
 
-        if (request.Isbn13 is { } isbn)
+        if (request.Isbn13 is { } isbn
+            && await db.Set<Book>().AsNoTracking().FirstOrDefaultAsync(b => b.Isbn13 == isbn && b.CatalogStatus != CatalogStatus.Rejected, cancellationToken) is { } existing)
         {
-            var existing = await db.Set<Book>().AsNoTracking()
-                .Where(b => b.Isbn13 == isbn && b.CatalogStatus != CatalogStatus.Rejected)
-                .Select(b => (Guid?)b.Id)
-                .FirstOrDefaultAsync(cancellationToken);
-            if (existing is { } id)
-            {
-                return Error.Conflict(BookExists, $"A book with this ISBN is already in the catalog: {id}.").ToProblem();
-            }
+            // Point to the existing book only if the caller may see it; someone else's submission stays private.
+            return GetItem.CanSee(existing, principal)
+                ? Error.Conflict(BookExists, $"A book with this ISBN is already in the catalog: {existing.Id}.").ToProblem()
+                : Error.Conflict(BookPendingReview, "Someone already submitted this book; it is waiting for review.").ToProblem();
         }
 
         var itemId = Guid.CreateVersion7();
@@ -112,7 +110,11 @@ public sealed class ManualBookRequest : IValidatableObject
             yield return new ValidationResult("isbn_invalid", [nameof(Isbn13)]);
         }
 
-        if (Authors is not null && Authors.Any(a => a.Length > 200))
+        if (Authors is not null && Authors.Any(a => a is null))
+        {
+            yield return new ValidationResult("required", [nameof(Authors)]);
+        }
+        else if (Authors is not null && Authors.Any(a => a.Length > 200))
         {
             yield return new ValidationResult("too_long", [nameof(Authors)]);
         }

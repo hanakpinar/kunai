@@ -9,7 +9,9 @@ internal static class IdentityErrors
     public const string InvalidToken = "invalid_or_expired_token";
 
     /// <summary>Maps ASP.NET Core Identity errors to Kunai error codes.</summary>
-    public static Error From(IEnumerable<IdentityError> errors)
+    /// <param name="errors">Identity's errors.</param>
+    /// <param name="passwordField">The request field that carried the password ("password" or "newPassword").</param>
+    public static Error From(IEnumerable<IdentityError> errors, string passwordField = "password")
     {
         var list = errors.ToList();
         if (list.Exists(e => e.Code is nameof(IdentityErrorDescriber.DuplicateUserName)))
@@ -34,7 +36,7 @@ internal static class IdentityErrors
             .ToArray();
         if (passwordCodes.Length > 0)
         {
-            fields["password"] = passwordCodes;
+            fields[passwordField] = passwordCodes;
         }
 
         if (list.Exists(e => e.Code is nameof(IdentityErrorDescriber.InvalidUserName)))

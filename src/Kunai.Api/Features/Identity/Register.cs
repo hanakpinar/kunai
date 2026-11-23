@@ -6,6 +6,9 @@ using Kunai.Api.Features.Profiles.Avatars;
 
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+
+using Npgsql;
 
 namespace Kunai.Api.Features.Identity;
 
@@ -40,10 +43,18 @@ public static class Register
         }
 
         var email = request.Email!.Trim();
+
+        // Check the password before looking at the email, so a weak password gets the same 400 whether or not
+        // the email is registered.
+        if (await PasswordErrorAsync(users, username, email, request.Password!) is { } weak)
+        {
+            return weak.ToProblem();
+        }
+
         if (await users.FindByEmailAsync(email) is { } existing)
         {
             // Do not reveal that the email is registered; tell its owner instead.
-            await emails.SendAccountExistsAsync(existing, cancellationToken);
+            await emails.SendAccountExistsAsync(existing, CancellationToken.None);
             return TypedResults.Accepted((string?)null);
         }
 
@@ -59,14 +70,52 @@ public static class Register
             CreatedAt = time.GetUtcNow(),
         };
 
-        var created = await users.CreateAsync(user, request.Password!);
-        if (!created.Succeeded)
+        var created = await CreateAsync(users, user, request.Password!);
+        if (created is not null)
         {
-            return IdentityErrors.From(created.Errors).ToProblem();
+            return created;
         }
 
-        await emails.SendConfirmationAsync(user, cancellationToken);
+        // The account exists now; a client that disconnects must not stop its confirmation email.
+        await emails.SendConfirmationAsync(user, CancellationToken.None);
         return TypedResults.Accepted((string?)null);
+    }
+
+    /// <returns>null on success, otherwise the response to send.</returns>
+    private static async Task<Results<Accepted, ProblemHttpResult>?> CreateAsync(UserManager<AppUser> users, AppUser user, string password)
+    {
+        try
+        {
+            var created = await users.CreateAsync(user, password);
+            if (created.Succeeded)
+            {
+                return null;
+            }
+
+            return IdentityErrors.From(created.Errors).ToProblem();
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } unique)
+        {
+            // A parallel registration won the race; answer as if we had checked first.
+            return string.Equals(unique.ConstraintName, "EmailIndex", StringComparison.Ordinal)
+                ? TypedResults.Accepted((string?)null)
+                : Error.Conflict(UsernameRules.TakenCode, "The username is already taken.").ToProblem();
+        }
+    }
+
+    private static async Task<Error?> PasswordErrorAsync(UserManager<AppUser> users, string username, string email, string password)
+    {
+        var candidate = new AppUser { UserName = username, Email = email };
+        foreach (var validator in users.PasswordValidators)
+        {
+            var result = await validator.ValidateAsync(users, candidate, password);
+            if (!result.Succeeded)
+            {
+                return IdentityErrors.From(result.Errors);
+            }
+        }
+
+        return null;
     }
 }
 

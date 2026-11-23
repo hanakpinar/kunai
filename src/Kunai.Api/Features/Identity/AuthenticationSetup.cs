@@ -1,8 +1,11 @@
+using System.Security.Claims;
+
 using Kunai.Api.Features.Identity.Sessions;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -25,7 +28,7 @@ public static class AuthenticationSetup
             services.GetRequiredService<IHostEnvironment>()));
         builder.Services.AddSingleton<AccessTokenIssuer>();
         builder.Services.AddScoped<SessionService>();
-        builder.Services.AddMemoryCache();
+        builder.Services.AddKeyedSingleton<IMemoryCache>(SessionService.CacheKeyName, (_, _) => new MemoryCache(new MemoryCacheOptions()));
         builder.Services.AddAuthToOpenApi();
 
         builder.Services.Configure<IdentityOptions>(options =>
@@ -82,6 +85,20 @@ public static class AuthenticationSetup
 
     private static void ConfigureCookie(IServiceCollection services)
     {
+        // Identity re-validates the security stamp every 30 minutes and rebuilds the principal; carry the
+        // session id over, or the session guard would sign the user out.
+        services.Configure<SecurityStampValidatorOptions>(options => options.OnRefreshingPrincipal = context =>
+        {
+            if (context.CurrentPrincipal?.FindFirst(KunaiClaims.SessionId) is { } sid
+                && context.NewPrincipal?.Identity is ClaimsIdentity identity
+                && !identity.HasClaim(c => string.Equals(c.Type, KunaiClaims.SessionId, StringComparison.Ordinal)))
+            {
+                identity.AddClaim(new Claim(KunaiClaims.SessionId, sid.Value));
+            }
+
+            return Task.CompletedTask;
+        });
+
         services.ConfigureApplicationCookie(options =>
         {
             options.Cookie.Name = CookieName;

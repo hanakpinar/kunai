@@ -75,7 +75,7 @@ public static class UpdateMe
             return Error.Unauthorized(ErrorCodes.Unauthorized, "The account no longer exists.").ToProblem();
         }
 
-        user.IsProfilePublic = request.IsProfilePublic;
+        user.IsProfilePublic = request.IsProfilePublic!.Value;
         user.Locale = request.Locale!;
         user.TimeZone = request.TimeZone!;
         user.AvatarId = request.AvatarId!;
@@ -88,9 +88,11 @@ public static class UpdateMe
         UsernameRequest request,
         ClaimsPrincipal principal,
         UserManager<AppUser> users,
+        SignInManager<AppUser> signIn,
         AppDbContext db,
         HybridCache cache,
         TimeProvider time,
+        HttpContext httpContext,
         CancellationToken cancellationToken)
     {
         var username = UsernameRules.Normalize(request.Username!);
@@ -124,6 +126,7 @@ public static class UpdateMe
         }
 
         await cache.RemoveByTagAsync(CacheTags.User(user.Id), cancellationToken);
+        await CookieRenewal.RenewIfCookieAsync(httpContext, principal, signIn, user);
         return await GetMe.HandleAsync(principal, db, cancellationToken);
     }
 }
@@ -141,7 +144,8 @@ public sealed class ProfileRequest
 public sealed class SettingsRequest
 {
     /// <summary>Private profiles answer 404 to everyone else.</summary>
-    public bool IsProfilePublic { get; init; }
+    [Required(ErrorMessage = "required")]
+    public bool? IsProfilePublic { get; init; }
 
     [Required(ErrorMessage = "required")]
     [AllowedValues("tr", "en", ErrorMessage = "locale_invalid")]

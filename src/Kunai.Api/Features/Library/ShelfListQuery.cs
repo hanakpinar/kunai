@@ -4,6 +4,7 @@ using System.Text.Json;
 
 using Kunai.Api.Common.Results;
 using Kunai.Api.Features.Catalog;
+using Kunai.Api.Features.Catalog.Items;
 using Kunai.Api.Persistence;
 
 using Microsoft.AspNetCore.WebUtilities;
@@ -19,12 +20,17 @@ public static class ShelfListQuery
 {
     public const int DefaultLimit = 24;
 
-    public static async Task<Result<ShelfPage>> RunAsync(AppDbContext db, Guid userId, ShelfListRequest request, CancellationToken cancellationToken)
+    /// <param name="db">Database.</param>
+    /// <param name="userId">Whose shelf.</param>
+    /// <param name="request">Filters, sort and paging.</param>
+    /// <param name="includeUnreviewed">True only for the shelf's owner: manual items waiting for review stay private.</param>
+    /// <param name="cancellationToken">Request cancellation.</param>
+    public static async Task<Result<ShelfPage>> RunAsync(AppDbContext db, Guid userId, ShelfListRequest request, bool includeUnreviewed, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(request);
 
-        var filtered = Filter(db, userId, request);
+        var filtered = Filter(db, userId, request, includeUnreviewed);
         if (!filtered.IsSuccess)
         {
             return filtered.Error;
@@ -59,20 +65,27 @@ public static class ShelfListQuery
         return new ShelfPage(items.Select(ShelfEntryResponse.From).ToList(), next, total);
     }
 
-    private static Result<IQueryable<ShelfEntry>> Filter(AppDbContext db, Guid userId, ShelfListRequest request)
+    private static Result<IQueryable<ShelfEntry>> Filter(AppDbContext db, Guid userId, ShelfListRequest request, bool includeUnreviewed)
     {
         var statuses = new List<ShelfStatus>();
         foreach (var value in request.Status ?? [])
         {
-            if (!Enum.TryParse<ShelfStatus>(value, ignoreCase: true, out var status) || !Enum.IsDefined(status))
+            // Whole names only: Enum.TryParse would also accept "1" or "planned,completed".
+            var name = Enum.GetNames<ShelfStatus>().FirstOrDefault(n => string.Equals(n, value, StringComparison.OrdinalIgnoreCase));
+            if (name is null)
             {
                 return Error.ValidationField("status", "status_invalid", $"Unknown status '{value}'.");
             }
 
-            statuses.Add(status);
+            statuses.Add(Enum.Parse<ShelfStatus>(name));
         }
 
         var query = db.Set<ShelfEntry>().AsNoTracking().Where(e => e.UserId == userId);
+        if (!includeUnreviewed)
+        {
+            query = query.Where(e => e.Item.CatalogStatus == CatalogStatus.Approved);
+        }
+
         if (request.Type is not null)
         {
             var type = Enum.Parse<ItemType>(request.Type, ignoreCase: true);

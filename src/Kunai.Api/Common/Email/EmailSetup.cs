@@ -8,7 +8,11 @@ public static class EmailSetup
     {
         builder.Services.AddOptions<EmailOptions>()
             .Bind(builder.Configuration.GetSection(EmailOptions.SectionName))
-            .PostConfigure(options => options.SmtpEndpoint ??= EndpointFromConnectionString(builder.Configuration.GetConnectionString("mailpit")));
+            .PostConfigure(options => options.SmtpEndpoint ??= EndpointFromConnectionString(builder.Configuration.GetConnectionString("mailpit")))
+            .Validate(
+                options => options.SmtpEndpoint is not null || builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing"),
+                "Email:SmtpEndpoint must be configured outside Development.")
+            .ValidateOnStart();
 
         builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
         return builder;

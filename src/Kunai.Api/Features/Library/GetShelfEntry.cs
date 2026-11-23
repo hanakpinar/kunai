@@ -18,6 +18,7 @@ public static class GetShelfEntry
         shelf.MapGet("/{itemId:guid}", HandleAsync)
             .WithName("GetShelfEntry")
             .WithSummary("My entry for an item, with its ETag")
+            .Produces(StatusCodes.Status304NotModified)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
     internal static async Task<Results<Ok<ShelfEntryResponse>, StatusCodeHttpResult, ProblemHttpResult>> HandleAsync(

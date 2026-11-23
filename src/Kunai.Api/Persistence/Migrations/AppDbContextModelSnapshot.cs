@@ -252,6 +252,7 @@ namespace Kunai.Api.Persistence.Migrations
                         .HasName("pk_users");
 
                     b.HasIndex("NormalizedEmail")
+                        .IsUnique()
                         .HasDatabaseName("EmailIndex");
 
                     b.HasIndex("NormalizedUserName")

@@ -23,7 +23,7 @@ public static class GetMyShelf
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
-        var page = await ShelfListQuery.RunAsync(db, principal.GetUserId(), request, cancellationToken);
+        var page = await ShelfListQuery.RunAsync(db, principal.GetUserId(), request, includeUnreviewed: true, cancellationToken);
         if (!page.IsSuccess)
         {
             return page.Error.ToProblem();

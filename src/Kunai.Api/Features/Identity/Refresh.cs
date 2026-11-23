@@ -36,7 +36,7 @@ public static class Refresh
 
         var (session, refreshToken) = rotated.Value;
         var user = await users.FindByIdAsync(session.UserId.ToString());
-        if (user is null || await users.IsLockedOutAsync(user))
+        if (user is null)
         {
             await sessions.RevokeAsync(session.Id, cancellationToken);
             return Error.Unauthorized(SessionService.InvalidRefreshToken, "Sign in again.").ToProblem();

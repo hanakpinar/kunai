@@ -43,6 +43,9 @@ internal static class AuthOpenApi
                     return Task.CompletedTask;
                 }
 
+                operation.Responses ??= [];
+                operation.Responses.TryAdd("401", OpenApiSetup.ProblemResponse("Not signed in, or the session ended.", context.Document));
+                operation.Responses.TryAdd("403", OpenApiSetup.ProblemResponse("Not allowed: a cookie write without the X-CSRF header, or a role the caller lacks.", context.Document));
                 operation.Security ??= [];
                 operation.Security.Add(new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference(BearerScheme, context.Document)] = [] });
                 operation.Security.Add(new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference(CookieScheme, context.Document)] = [] });

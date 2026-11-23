@@ -2,6 +2,7 @@ using Kunai.Api.Common.Email;
 using Kunai.Api.IntegrationTests.Infrastructure;
 
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -79,6 +80,10 @@ public sealed class KunaiApiFactory : WebApplicationFactory<Program>, IAsyncLife
         {
             services.RemoveAll<IEmailSender>();
             services.AddSingleton<IEmailSender>(Emails);
+
+            // Re-check the security stamp on every cookie request, so cookie tests cover the 30-minute
+            // re-validation path immediately.
+            services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.Zero);
         });
     }
 }

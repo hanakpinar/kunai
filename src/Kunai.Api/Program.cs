@@ -6,6 +6,7 @@ using Kunai.Api.Common.Http;
 using Kunai.Api.Common.OpenApi;
 using Kunai.Api.Features.Catalog;
 using Kunai.Api.Features.Identity;
+using Kunai.Api.Features.Identity.Sessions;
 using Kunai.Api.Features.Library;
 using Kunai.Api.Features.Moderation;
 using Kunai.Api.Features.Profiles;
@@ -21,9 +22,10 @@ builder.AddServiceDefaults();
 builder.Services.AddKunaiProblemDetails();
 builder.Services.AddValidation();
 builder.Services.ConfigureHttpJsonOptions(options =>
-    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false)));
 builder.Services.AddKunaiOpenApi();
 builder.Services.AddKunaiRateLimiting(builder.Configuration);
+builder.Services.AddKunaiForwardedHeaders(builder.Configuration);
 builder.Services.AddSingleton(TimeProvider.System);
 
 // Infrastructure
@@ -37,9 +39,13 @@ builder.AddKunaiCatalog();
 
 var app = builder.Build();
 
+// Fail at boot, not at the first sign-in, when the signing key is missing or malformed.
+_ = app.Services.GetRequiredService<JwtSigningKey>();
+
 await app.MigrateDatabaseAsync();
 await app.GrantConfiguredAdminsAsync();
 
+app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseKunaiSecurityHeaders();

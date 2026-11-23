@@ -22,9 +22,11 @@ internal sealed class SmtpEmailSender(IOptions<EmailOptions> options) : IEmailSe
         mime.Body = new BodyBuilder { HtmlBody = message.HtmlBody, TextBody = message.TextBody }.ToMessageBody();
 
         using var client = new MailKit.Net.Smtp.SmtpClient();
-        var security = string.Equals(endpoint.Scheme, "smtps", StringComparison.OrdinalIgnoreCase)
-            ? SecureSocketOptions.SslOnConnect
-            : SecureSocketOptions.StartTlsWhenAvailable;
+        // Credentials and reset links must not cross a network in clear text; only a local relay (Mailpit) may skip TLS.
+        var security = string.Equals(endpoint.Scheme, "smtps", StringComparison.OrdinalIgnoreCase) ? SecureSocketOptions.SslOnConnect
+            : endpoint.IsLoopback ? SecureSocketOptions.StartTlsWhenAvailable
+            : SecureSocketOptions.StartTls;
+        client.Timeout = (int)TimeSpan.FromSeconds(15).TotalMilliseconds;
         await client.ConnectAsync(endpoint.Host, endpoint.Port, security, cancellationToken);
 
         if (!string.IsNullOrEmpty(settings.SmtpUsername))

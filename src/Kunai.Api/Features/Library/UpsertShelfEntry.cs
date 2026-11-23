@@ -126,7 +126,10 @@ public static class UpsertShelfEntry
         }
         catch (DbUpdateConcurrencyException)
         {
-            return PreconditionFailed.ToProblem();
+            // With If-Match the client asked for exactly this check; without it, tell it to read and retry.
+            return headers.IfMatch.Count > 0
+                ? PreconditionFailed.ToProblem()
+                : Error.Conflict(ConcurrentChange, "The entry changed at the same time on another request. Read it and try again.").ToProblem();
         }
 
         ShelfEntryETag.Write(httpContext.Response, entry);

@@ -84,7 +84,11 @@ dotnet user-secrets set "Providers:Igdb:ClientId" "<Twitch client id>" --project
 dotnet user-secrets set "Providers:Igdb:ClientSecret" "<Twitch client secret>" --project src/Kunai.Api
 ```
 
-To make your own account an admin and moderator, add its email under `Admin:Emails` (user secrets or environment) and restart.
+To make your own account an admin and moderator, add its (confirmed) email under `Admin:Emails` (user secrets or environment) and restart.
+
+### Running behind a proxy
+
+Per-IP rate limits need the real client address. List the proxies allowed to send `X-Forwarded-For` under `ReverseProxy:KnownProxies` (addresses) or `ReverseProxy:KnownNetworks` (CIDR ranges); loopback is trusted by default. Outside Development the API also requires `Auth:Jwt:SigningKeyPem` (an EC P-256 private key), `Email:SmtpEndpoint` and an https `App:WebBaseUrl`, and refuses to start without them.
 
 ### Tests
 

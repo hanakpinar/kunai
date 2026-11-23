@@ -4,6 +4,7 @@ using System.Security.Claims;
 using Kunai.Api.Common.Caching;
 using Kunai.Api.Common.Http;
 using Kunai.Api.Features.Catalog;
+using Kunai.Api.Features.Catalog.Items;
 using Kunai.Api.Features.Library;
 using Kunai.Api.Persistence;
 
@@ -53,7 +54,7 @@ public static class GetUserStats
     private static async Task<StatsResponse> ComputeAsync(AppDbContext db, Guid userId, int year, CancellationToken cancellationToken)
     {
         var completed = db.Set<ShelfEntry>().AsNoTracking()
-            .Where(e => e.UserId == userId && e.Status == ShelfStatus.Completed && e.FinishedOn != null);
+            .Where(e => e.UserId == userId && e.Item.CatalogStatus == CatalogStatus.Approved && e.Status == ShelfStatus.Completed && e.FinishedOn != null);
 
         var years = await completed.Select(e => e.FinishedOn!.Value.Year).Distinct().OrderByDescending(y => y).ToListAsync(cancellationToken);
 

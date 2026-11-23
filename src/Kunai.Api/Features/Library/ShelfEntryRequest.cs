@@ -31,6 +31,14 @@ public sealed class ShelfEntryRequest : IValidatableObject
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
+        foreach (var (date, field) in new[] { (StartedOn, nameof(StartedOn)), (FinishedOn, nameof(FinishedOn)) })
+        {
+            if (date is { Year: < 1000 or > 3000 })
+            {
+                yield return new ValidationResult("year_out_of_range", [field]);
+            }
+        }
+
         if (StartedOn is { } started && FinishedOn is { } finished && finished < started)
         {
             yield return new ValidationResult("finished_before_started", [nameof(FinishedOn)]);

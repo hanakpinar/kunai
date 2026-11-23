@@ -22,7 +22,7 @@ public static class ProfileSummary
         ArgumentNullException.ThrowIfNull(user);
 
         var groups = await db.Set<ShelfEntry>().AsNoTracking()
-            .Where(e => e.UserId == user.Id)
+            .Where(e => e.UserId == user.Id && e.Item.CatalogStatus == CatalogStatus.Approved)
             .GroupBy(e => new { e.Item.Type, e.Status })
             .Select(g => new { g.Key.Type, g.Key.Status, Count = g.Count() })
             .ToListAsync(cancellationToken);
@@ -31,13 +31,13 @@ public static class ProfileSummary
         var from = new DateOnly(year, 1, 1);
         var to = new DateOnly(year, 12, 31);
         var thisYear = await db.Set<ShelfEntry>().AsNoTracking()
-            .Where(e => e.UserId == user.Id && e.Status == ShelfStatus.Completed && e.FinishedOn >= from && e.FinishedOn <= to)
+            .Where(e => e.UserId == user.Id && e.Item.CatalogStatus == CatalogStatus.Approved && e.Status == ShelfStatus.Completed && e.FinishedOn >= from && e.FinishedOn <= to)
             .GroupBy(e => e.Item.Type)
             .Select(g => new TypeCount(g.Key, g.Count()))
             .ToListAsync(cancellationToken);
 
         var favorites = await db.Set<ShelfEntry>().AsNoTracking()
-            .Where(e => e.UserId == user.Id && e.IsFavorite)
+            .Where(e => e.UserId == user.Id && e.Item.CatalogStatus == CatalogStatus.Approved && e.IsFavorite)
             .OrderByDescending(e => e.UpdatedAt)
             .Take(FavoritesShown)
             .Select(e => e.Item)

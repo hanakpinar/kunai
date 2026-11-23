@@ -14,7 +14,7 @@ namespace Kunai.Api.Features.Catalog.Search;
 
 public static class SearchCatalog
 {
-    private static readonly HybridCacheEntryOptions CacheFor12Hours = new() { Expiration = TimeSpan.FromHours(12) };
+    private static readonly HybridCacheEntryOptions CacheFor12Hours = new() { Expiration = TimeSpan.FromHours(12), LocalCacheExpiration = TimeSpan.FromMinutes(30) };
 
     public static void Map(IEndpointRouteBuilder api) =>
         api.MapGet("/search", HandleAsync)
@@ -35,7 +35,7 @@ public static class SearchCatalog
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
-        var query = request.Q!.Trim();
+        var query = string.Join(' ', request.Q!.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
         if (query.Length < 2)
         {
             return Error.ValidationField("q", "query_length", "Search with at least 2 characters.").ToProblem();
@@ -77,7 +77,7 @@ public static class SearchCatalog
                 hit.CoverUrl?.ToString()))
             .ToList();
 
-        return TypedResults.Ok(new SearchResponse([.. local, .. items], result.HasMore ? SearchCursor.Encode(page + 1) : null));
+        return TypedResults.Ok(new SearchResponse([.. local, .. items], result.HasMore && page < SearchCursor.MaxPage ? SearchCursor.Encode(page + 1) : null));
     }
 
     /// <summary>Approved, manually added books whose title contains the query (first page only).</summary>

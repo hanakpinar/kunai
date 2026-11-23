@@ -17,6 +17,9 @@ public static class Login
     public const string AccountLocked = "account_locked";
     public const string EmailNotConfirmed = "email_not_confirmed";
 
+    private static readonly AppUser TimingDummy = new() { UserName = "timing-dummy" };
+    private static readonly string DummyHash = new PasswordHasher<AppUser>().HashPassword(TimingDummy, Guid.NewGuid().ToString());
+
     public static void Map(RouteGroupBuilder auth) =>
         auth.MapPost("/login", HandleAsync)
             .WithName("Login")
@@ -44,6 +47,8 @@ public static class Login
             : await users.FindByNameAsync(UsernameRules.Normalize(login));
         if (user is null)
         {
+            // Hash anyway, so response time does not tell which logins exist.
+            users.PasswordHasher.VerifyHashedPassword(TimingDummy, DummyHash, request.Password!);
             return invalid.ToProblem();
         }
 

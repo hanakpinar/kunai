@@ -13,12 +13,13 @@ namespace Kunai.Api.Features.Identity.Sessions;
 /// <summary>Creates, refreshes and revokes sessions. Refresh tokens rotate on every use.</summary>
 public sealed partial class SessionService(
     AppDbContext db,
-    IMemoryCache cache,
+    [FromKeyedServices(SessionService.CacheKeyName)] IMemoryCache cache,
     IOptions<JwtOptions> options,
     TimeProvider time,
     ILogger<SessionService> logger)
 {
     public const string InvalidRefreshToken = "invalid_refresh_token";
+    public const string CacheKeyName = "sessions";
 
     private static readonly TimeSpan ActiveCacheDuration = TimeSpan.FromSeconds(60);
 

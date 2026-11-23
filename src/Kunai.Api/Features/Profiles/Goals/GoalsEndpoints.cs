@@ -5,6 +5,7 @@ using Kunai.Api.Common.Caching;
 using Kunai.Api.Common.Http;
 using Kunai.Api.Common.Results;
 using Kunai.Api.Features.Catalog;
+using Kunai.Api.Features.Catalog.Items;
 using Kunai.Api.Features.Identity;
 using Kunai.Api.Features.Library;
 using Kunai.Api.Persistence;
@@ -45,9 +46,15 @@ public static class GoalsEndpoints
         }
 
         var userId = principal.GetUserId();
-        await db.Set<UserGoal>().Where(g => g.UserId == userId && g.Year == year).ExecuteDeleteAsync(cancellationToken);
-        db.AddRange(targets.Select(t => new UserGoal { UserId = userId, Year = year, Type = t.Type!.Value, Target = t.Target }));
-        await db.SaveChangesAsync(cancellationToken);
+        await using (var transaction = await db.Database.BeginTransactionAsync(cancellationToken))
+        {
+            // Lock the user's row so two parallel PUTs replace the goals one after the other.
+            await db.Database.ExecuteSqlAsync($"SELECT 1 FROM users WHERE id = {userId} FOR UPDATE", cancellationToken);
+            await db.Set<UserGoal>().Where(g => g.UserId == userId && g.Year == year).ExecuteDeleteAsync(cancellationToken);
+            db.AddRange(targets.Select(t => new UserGoal { UserId = userId, Year = year, Type = t.Type!.Value, Target = t.Target }));
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
         await cache.RemoveByTagAsync(CacheTags.User(userId), cancellationToken);
 
         return TypedResults.Ok(await ComputeAsync(db, userId, year, cancellationToken));
@@ -72,7 +79,7 @@ public static class GoalsEndpoints
         var from = new DateOnly(year, 1, 1);
         var to = new DateOnly(year, 12, 31);
         var done = await db.Set<ShelfEntry>().AsNoTracking()
-            .Where(e => e.UserId == userId && e.Status == ShelfStatus.Completed && e.FinishedOn >= from && e.FinishedOn <= to)
+            .Where(e => e.UserId == userId && e.Item.CatalogStatus == CatalogStatus.Approved && e.Status == ShelfStatus.Completed && e.FinishedOn >= from && e.FinishedOn <= to)
             .GroupBy(e => e.Item.Type)
             .Select(g => new { Type = g.Key, Count = g.Count() })
             .ToDictionaryAsync(g => g.Type, g => g.Count, cancellationToken);
@@ -89,16 +96,25 @@ public static class GoalsEndpoints
     }
 }
 
-public sealed class GoalsRequest
+public sealed class GoalsRequest : IValidatableObject
 {
     [Required(ErrorMessage = "required")]
     [MaxLength(6, ErrorMessage = "too_many")]
     public IReadOnlyList<GoalTarget>? Targets { get; init; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (Targets is not null && Targets.Any(t => t is null))
+        {
+            yield return new ValidationResult("required", [nameof(Targets)]);
+        }
+    }
 }
 
 public sealed class GoalTarget
 {
     [Required(ErrorMessage = "required")]
+    [EnumDataType(typeof(ItemType), ErrorMessage = "type_invalid")]
     public ItemType? Type { get; init; }
 
     [Range(1, 10_000, ErrorMessage = "target_out_of_range")]

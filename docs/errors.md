@@ -85,7 +85,8 @@ Every error response is `application/problem+json` ([RFC 9457](https://www.rfc-e
 | `provider_unavailable` | 503 | The provider is not answering |
 | `provider_not_configured` | 503 | The server has no credentials for this provider |
 | `isbn_invalid` | 400 (field) | Not a valid ISBN-13 |
-| `book_exists` | 409 | A book with this ISBN is already in the catalog |
+| `book_exists` | 409 | A book with this ISBN is already in the catalog (its id is in `detail`) |
+| `book_pending_review` | 409 | Someone else already submitted this ISBN; it is waiting for review |
 | `manual_item_limit` | 422 | At most 10 manually added books a day |
 | `item_not_pending` | 409 | The item was already approved or rejected |
 
@@ -96,14 +97,15 @@ Every error response is `application/problem+json` ([RFC 9457](https://www.rfc-e
 | `rating_out_of_range` | 400 (field) | Rating outside 1-10 |
 | `progress_out_of_range` | 400 (field) | Negative or absurd progress |
 | `finished_before_started` | 400 (field) | `finishedOn` is before `startedOn` |
-| `status_invalid` | 400 (field) | Unknown status in a filter |
+| `year_out_of_range` | 400 (field) | A date or year outside 1000-3000 |
+| `status_invalid` | 400 (field) | Unknown status in a filter (whole names only, one per `status` key) |
 | `sort_invalid` | 400 (field) | Unknown sort |
 | `status_not_allowed` | 422 (field) | The status does not exist for this type (e.g. a movie "in progress") |
 | `planned_has_no_activity` | 422 (field) | Planned entries have no rating, dates or progress |
 | `progress_not_tracked` | 422 (field) | This type has no progress (movies) |
 | `progress_exceeds_total` | 422 (field) | More pages/episodes/chapters than the item has, or more than 100% |
 | `shelf_entry_not_found` | 404 | The item is not on your shelf |
-| `concurrent_change` | 409 | The entry was created by another request at the same moment |
+| `concurrent_change` | 409 | Another request changed the entry at the same moment (without `If-Match`); read it and try again |
 
 ### Profiles and goals
 

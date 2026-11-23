@@ -14,7 +14,7 @@ If work stops midway, continue from the first unchecked step.
 | 7 | Shelf endpoints | ✅ done |
 | 8 | Profiles, settings, ninja avatars, stats, belts (ranks) and yearly goals (missions) | ✅ done |
 | 9 | Account lifecycle (password reset/change, account deletion) and manual book moderation | ✅ done |
-| 10 | Independent review and fixes | ⏳ in progress |
+| 10 | Independent review and fixes | ✅ done |
 | 11 | Documentation (README, ADRs, error catalogue, mobile integration guide) | ✅ done (kept current) |
 
 ## Deferred on purpose
