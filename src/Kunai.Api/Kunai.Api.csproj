@@ -7,6 +7,13 @@
     <UserSecretsId>kunai-api</UserSecretsId>
   </PropertyGroup>
 
+  <!-- dotnet publish -t:PublishContainer builds the image without a Dockerfile.
+       "chiseled-extra" adds ICU and time zone data, needed for tr-TR text handling and IANA time zones. -->
+  <PropertyGroup>
+    <ContainerRepository>kunai-api</ContainerRepository>
+    <ContainerFamily>noble-chiseled-extra</ContainerFamily>
+  </PropertyGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="Kunai.Api.UnitTests" />
     <InternalsVisibleTo Include="Kunai.Api.IntegrationTests" />

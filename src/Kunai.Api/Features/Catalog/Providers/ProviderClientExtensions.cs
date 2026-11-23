@@ -10,15 +10,22 @@ public static class ProviderClientExtensions
     /// </summary>
     public static IHttpClientBuilder AddProviderResilience(this IHttpClientBuilder builder, IConfiguration configuration)
     {
-        builder.AddStandardResilienceHandler()
+        var pipeline = builder.AddStandardResilienceHandler()
             .Configure(options =>
             {
                 options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(5);
                 options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(12);
                 options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(30);
                 options.Retry.MaxRetryAttempts = 2;
-            })
-            .Configure(configuration.GetSection("Providers:Resilience"));
+            });
+
+        // Binding an absent section throws, so overrides are applied only when configured.
+        var overrides = configuration.GetSection("Providers:Resilience");
+        if (overrides.Exists())
+        {
+            pipeline.Configure(overrides);
+        }
+
         return builder;
     }
 }
