@@ -9,6 +9,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 using Testcontainers.PostgreSql;
 
+using WireMock.Server;
+
 [assembly: AssemblyFixture(typeof(KunaiApiFactory))]
 
 namespace Kunai.Api.IntegrationTests.Infrastructure;
@@ -25,6 +27,9 @@ public sealed class KunaiApiFactory : WebApplicationFactory<Program>, IAsyncLife
 
     public FakeEmailSender Emails { get; } = new();
 
+    /// <summary>Stands in for TMDB, Google Books, Open Library, IGDB, Twitch and AniList. Paths are prefixed per provider.</summary>
+    public WireMockServer Providers { get; } = WireMockServer.Start();
+
     public async ValueTask InitializeAsync()
     {
         await _postgres.StartAsync(TestContext.Current.CancellationToken);
@@ -37,6 +42,8 @@ public sealed class KunaiApiFactory : WebApplicationFactory<Program>, IAsyncLife
     {
         await base.DisposeAsync();
         await _postgres.DisposeAsync();
+        Providers.Stop();
+        Providers.Dispose();
     }
 
     /// <summary>An HTTPS client, so Secure cookies round-trip like in a browser.</summary>
@@ -52,6 +59,20 @@ public sealed class KunaiApiFactory : WebApplicationFactory<Program>, IAsyncLife
         builder.UseSetting("ConnectionStrings:kunaidb", _postgres.GetConnectionString());
         builder.UseSetting("RateLimiting:Enabled", "false");
         builder.UseSetting("Security:PwnedPasswords:Enabled", "false");
+
+        var providers = Providers.Url!;
+        builder.UseSetting("Providers:Resilience:Retry:MaxRetryAttempts", "1");
+        builder.UseSetting("Providers:Resilience:Retry:Delay", "00:00:00.010");
+        builder.UseSetting("Providers:Resilience:CircuitBreaker:MinimumThroughput", "1000");
+        builder.UseSetting("Providers:Tmdb:BaseUrl", $"{providers}/tmdb/3/");
+        builder.UseSetting("Providers:Tmdb:AccessToken", "test-token");
+        builder.UseSetting("Providers:GoogleBooks:BaseUrl", $"{providers}/gbooks/v1/");
+        builder.UseSetting("Providers:OpenLibrary:BaseUrl", $"{providers}/olib/");
+        builder.UseSetting("Providers:Igdb:BaseUrl", $"{providers}/igdb/v4/");
+        builder.UseSetting("Providers:Igdb:TokenUrl", $"{providers}/twitch/oauth2/token");
+        builder.UseSetting("Providers:Igdb:ClientId", "test-client");
+        builder.UseSetting("Providers:Igdb:ClientSecret", "test-secret");
+        builder.UseSetting("Providers:AniList:BaseUrl", $"{providers}/anilist/");
 
         builder.ConfigureTestServices(services =>
         {

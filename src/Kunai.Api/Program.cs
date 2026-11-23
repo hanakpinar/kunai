@@ -31,6 +31,7 @@ builder.AddKunaiEmail();
 // Features
 builder.AddKunaiIdentity();
 builder.AddKunaiAuthentication();
+builder.AddKunaiCatalog();
 
 var app = builder.Build();
 

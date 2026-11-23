@@ -17,7 +17,20 @@ public readonly record struct ExternalRef(ItemSource Source, string Kind, string
         [ItemSource.AniList] = "anilist",
     };
 
+    /// <summary>The value stored in items.external_id: kind and id, unique per source.</summary>
+    public string StoredId => $"{Kind}:{Id}";
+
     public override string ToString() => $"{Prefixes[Source]}:{Kind}:{Id}";
+
+    /// <summary>Rebuilds a reference from a stored item; null for manual items.</summary>
+    public static ExternalRef? FromStored(ItemSource source, string storedId)
+    {
+        ArgumentNullException.ThrowIfNull(storedId);
+        var separator = storedId.IndexOf(':', StringComparison.Ordinal);
+        return source == ItemSource.Manual || separator <= 0
+            ? null
+            : new ExternalRef(source, storedId[..separator], storedId[(separator + 1)..]);
+    }
 
     public static bool TryParse(string? value, [NotNullWhen(true)] out ExternalRef? result)
     {
