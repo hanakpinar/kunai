@@ -1,0 +1,100 @@
+# Sample requests. Start the API (dotnet run --project src/Kunai.AppHost), set @host to the API's URL,
+# then run the requests top to bottom. Read the confirmation link from Mailpit.
+
+@host = http://localhost:5003
+@api = {{host}}/api/v1
+
+### Item types, statuses and labels
+GET {{api}}/item-types
+
+### Register
+POST {{api}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "ninja@example.com",
+  "username": "ninja",
+  "password": "correct horse battery staple",
+  "locale": "tr"
+}
+
+### Confirm the email (userId and token from the email in Mailpit)
+POST {{api}}/auth/confirm-email
+Content-Type: application/json
+
+{
+  "userId": "00000000-0000-0000-0000-000000000000",
+  "token": "paste-the-token"
+}
+
+### Sign in as a mobile client
+# @name login
+POST {{api}}/auth/login
+Content-Type: application/json
+
+{
+  "login": "ninja",
+  "password": "correct horse battery staple",
+  "deviceName": "http file"
+}
+
+###
+@token = {{login.response.body.accessToken}}
+@refresh = {{login.response.body.refreshToken}}
+
+### Who am I
+GET {{api}}/me
+Authorization: Bearer {{token}}
+
+### Search books
+GET {{api}}/search?q=dune&type=book
+Authorization: Bearer {{token}}
+
+### Import a search hit
+# @name import
+POST {{api}}/items/import
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "ref": "gbooks:volume:B1hSG45JCX4C"
+}
+
+###
+@itemId = {{import.response.body.id}}
+
+### Put it on my shelf
+PUT {{api}}/me/shelf/{{itemId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "completed",
+  "rating": 9,
+  "finishedOn": "2026-11-20",
+  "isFavorite": true
+}
+
+### My shelf, best rated first
+GET {{api}}/me/shelf?sort=-rating&limit=10
+Authorization: Bearer {{token}}
+
+### Set this year's mission
+PUT {{api}}/me/goals/2026
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "targets": [ { "type": "book", "target": 30 }, { "type": "movie", "target": 50 } ]
+}
+
+### Public profile with belt and avatar
+GET {{api}}/users/ninja
+
+### Refresh tokens (single use)
+POST {{api}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refresh}}"
+}
