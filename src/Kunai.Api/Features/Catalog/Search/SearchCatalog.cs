@@ -47,9 +47,15 @@ public static class SearchCatalog
         }
 
         var type = Enum.Parse<ItemType>(request.Type!, ignoreCase: true);
+        var local = page == 1 && type == ItemType.Book ? await LocalBooksAsync(db, query, cancellationToken) : [];
         var (result, source, error) = await SearchProvidersAsync(providers.ForSearch(type), type, query, page, cache, cancellationToken);
         if (result is null)
         {
+            if (local.Count > 0)
+            {
+                return TypedResults.Ok(new SearchResponse(local, null));
+            }
+
             httpContext.Response.Headers.RetryAfter = "30";
             return (error ?? ProviderErrors.NotConfigured(ItemSource.Manual)).ToProblem();
         }
@@ -71,7 +77,19 @@ public static class SearchCatalog
                 hit.CoverUrl?.ToString()))
             .ToList();
 
-        return TypedResults.Ok(new SearchResponse(items, result.HasMore ? SearchCursor.Encode(page + 1) : null));
+        return TypedResults.Ok(new SearchResponse([.. local, .. items], result.HasMore ? SearchCursor.Encode(page + 1) : null));
+    }
+
+    /// <summary>Approved, manually added books whose title contains the query (first page only).</summary>
+    private static async Task<List<SearchItem>> LocalBooksAsync(AppDbContext db, string query, CancellationToken cancellationToken)
+    {
+        var pattern = "%" + query.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal) + "%";
+        var books = await db.Set<Book>().AsNoTracking()
+            .Where(b => b.Source == ItemSource.Manual && b.CatalogStatus == CatalogStatus.Approved && EF.Functions.ILike(b.Title, pattern, "\\"))
+            .OrderBy(b => b.Title)
+            .Take(5)
+            .ToListAsync(cancellationToken);
+        return books.Select(b => new SearchItem(null, b.Id, ItemType.Book, b.Title, b.Year, string.Join(", ", b.Creators), null)).ToList();
     }
 
     /// <summary>Tries the type's providers in order (e.g. Google Books, then Open Library) and caches successes.</summary>
@@ -137,11 +155,11 @@ public sealed class SearchRequest
 /// <param name="NextCursor">Pass as "cursor" to get the next page; null on the last page.</param>
 public sealed record SearchResponse(IReadOnlyList<SearchItem> Items, string? NextCursor);
 
-/// <param name="Ref">Provider reference; send it to /items/import when Id is null.</param>
+/// <param name="Ref">Provider reference; send it to /items/import when Id is null. Null for manually added books.</param>
 /// <param name="Id">The catalog id when the item was already imported.</param>
 /// <param name="Type">Item type.</param>
 /// <param name="Title">Display title.</param>
 /// <param name="Year">Release or publication year.</param>
 /// <param name="Subtitle">Secondary line: authors, original title, platforms...</param>
 /// <param name="CoverUrl">HTTPS cover image.</param>
-public sealed record SearchItem(string Ref, Guid? Id, ItemType Type, string Title, int? Year, string? Subtitle, string? CoverUrl);
+public sealed record SearchItem(string? Ref, Guid? Id, ItemType Type, string Title, int? Year, string? Subtitle, string? CoverUrl);

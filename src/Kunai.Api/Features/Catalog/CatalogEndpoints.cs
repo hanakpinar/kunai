@@ -12,6 +12,7 @@ public static class CatalogEndpoints
         SearchCatalog.Map(api);
         ImportItem.Map(api);
         GetItem.Map(api);
+        AddManualBook.Map(api);
         return api;
     }
 }

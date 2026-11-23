@@ -20,6 +20,7 @@ namespace Kunai.Api.Persistence.Migrations
                 .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("Kunai.Api.Features.Catalog.Items.Item", b =>
@@ -109,6 +110,15 @@ namespace Kunai.Api.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_items");
+
+                    b.HasIndex("CreatedByUserId")
+                        .HasDatabaseName("ix_items_created_by_user_id");
+
+                    b.HasIndex("Title")
+                        .HasDatabaseName("ix_items_title");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Title"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Title"), new[] { "gin_trgm_ops" });
 
                     b.HasIndex("Source", "ExternalId")
                         .IsUnique()
@@ -508,6 +518,22 @@ namespace Kunai.Api.Persistence.Migrations
                         .HasDatabaseName("RoleNameIndex");
 
                     b.ToTable("roles", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("0193e2a0-0000-7000-8000-000000000001"),
+                            ConcurrencyStamp = "8b0e7f4e-admin",
+                            Name = "admin",
+                            NormalizedName = "ADMIN"
+                        },
+                        new
+                        {
+                            Id = new Guid("0193e2a0-0000-7000-8000-000000000002"),
+                            ConcurrencyStamp = "8b0e7f4e-moderator",
+                            Name = "moderator",
+                            NormalizedName = "MODERATOR"
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

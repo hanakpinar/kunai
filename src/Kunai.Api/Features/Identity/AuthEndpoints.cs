@@ -13,6 +13,7 @@ public static class AuthEndpoints
         Login.Map(auth);
         Refresh.Map(auth);
         Logout.Map(auth);
+        PasswordEndpoints.MapAuth(auth);
 
         return api;
     }

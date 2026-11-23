@@ -7,6 +7,7 @@ using Kunai.Api.Common.OpenApi;
 using Kunai.Api.Features.Catalog;
 using Kunai.Api.Features.Identity;
 using Kunai.Api.Features.Library;
+using Kunai.Api.Features.Moderation;
 using Kunai.Api.Features.Profiles;
 using Kunai.Api.Persistence;
 
@@ -37,6 +38,7 @@ builder.AddKunaiCatalog();
 var app = builder.Build();
 
 await app.MigrateDatabaseAsync();
+await app.GrantConfiguredAdminsAsync();
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
@@ -58,5 +60,6 @@ api.MapMeEndpoints();
 api.MapCatalogEndpoints();
 api.MapLibraryEndpoints();
 api.MapUsersEndpoints();
+api.MapModerationEndpoints();
 
 await app.RunAsync();

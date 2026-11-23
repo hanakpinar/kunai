@@ -113,13 +113,16 @@ public sealed partial class SessionService(
         }
     }
 
-    public async Task RevokeAllAsync(Guid userId, CancellationToken cancellationToken)
+    public Task RevokeAllAsync(Guid userId, CancellationToken cancellationToken) =>
+        RevokeAllExceptAsync(userId, keep: null, cancellationToken);
+
+    /// <summary>Revokes every session of the user except <paramref name="keep"/> (the caller's own device).</summary>
+    public async Task RevokeAllExceptAsync(Guid userId, Guid? keep, CancellationToken cancellationToken)
     {
         var now = time.GetUtcNow();
-        var ids = await db.Set<UserSession>().Where(s => s.UserId == userId && s.RevokedAt == null)
-            .Select(s => s.Id).ToListAsync(cancellationToken);
-        await db.Set<UserSession>().Where(s => s.UserId == userId && s.RevokedAt == null)
-            .ExecuteUpdateAsync(set => set.SetProperty(s => s.RevokedAt, now), cancellationToken);
+        var sessions = db.Set<UserSession>().Where(s => s.UserId == userId && s.RevokedAt == null && s.Id != keep);
+        var ids = await sessions.Select(s => s.Id).ToListAsync(cancellationToken);
+        await sessions.ExecuteUpdateAsync(set => set.SetProperty(s => s.RevokedAt, now), cancellationToken);
         foreach (var id in ids)
         {
             cache.Remove(CacheKey(id));

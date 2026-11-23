@@ -34,6 +34,10 @@ internal sealed class ItemConfiguration : IEntityTypeConfiguration<Item>
         // Two users importing the same movie at once end up with one row.
         item.HasIndex(i => new { i.Source, i.ExternalId }).IsUnique();
         item.HasIndex(i => new { i.Type, i.CatalogStatus });
+        item.HasIndex(i => i.CreatedByUserId);
+
+        // Trigram index: fast case-insensitive "contains" search over local (manually added) titles.
+        item.HasIndex(i => i.Title).HasMethod("gin").HasOperators("gin_trgm_ops");
     }
 }
 

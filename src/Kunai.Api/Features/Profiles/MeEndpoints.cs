@@ -1,3 +1,4 @@
+using Kunai.Api.Features.Identity;
 using Kunai.Api.Features.Profiles.Goals;
 
 namespace Kunai.Api.Features.Profiles;
@@ -12,6 +13,8 @@ public static class MeEndpoints
         GetMe.Map(me);
         UpdateMe.Map(me);
         GoalsEndpoints.MapMine(me);
+        PasswordEndpoints.MapMe(me);
+        DeleteAccount.Map(me);
 
         return api;
     }

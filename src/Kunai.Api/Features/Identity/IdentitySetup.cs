@@ -30,11 +30,13 @@ public static class IdentitySetup
                 options.Lockout.AllowedForNewUsers = true;
 
                 options.SignIn.RequireConfirmedEmail = true;
+                options.Tokens.PasswordResetTokenProvider = PasswordResetTokenProvider.ProviderName;
             })
             .AddRoles<IdentityRole<Guid>>()
             .AddEntityFrameworkStores<AppDbContext>()
             .AddSignInManager()
-            .AddDefaultTokenProviders();
+            .AddDefaultTokenProviders()
+            .AddTokenProvider<PasswordResetTokenProvider>(PasswordResetTokenProvider.ProviderName);
 
         var pwned = builder.Configuration.GetSection(PwnedPasswordsOptions.SectionName).Get<PwnedPasswordsOptions>()
             ?? new PwnedPasswordsOptions();

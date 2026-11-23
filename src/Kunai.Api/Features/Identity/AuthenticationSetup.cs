@@ -54,7 +54,8 @@ public static class AuthenticationSetup
 
         // Secure by default: every endpoint requires a signed-in user unless it opts out with AllowAnonymous.
         builder.Services.AddAuthorizationBuilder()
-            .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+            .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
+            .AddPolicy(Policies.Moderator, policy => policy.RequireRole(Roles.Moderator, Roles.Admin));
 
         return builder;
     }
