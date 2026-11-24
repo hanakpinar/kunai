@@ -1,0 +1,49 @@
+.toolbar {
+    justify-content: space-between;
+}
+
+.year {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.goals {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1rem;
+    margin: 0 0 1rem;
+    padding: 0;
+    list-style: none;
+}
+
+.goal {
+    display: grid;
+    gap: 0.6rem;
+}
+
+.goal__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.goal__head h3 {
+    margin: 0;
+}
+
+.goal__count {
+    font-size: 1.3rem;
+    font-weight: 800;
+}
+
+.goal p {
+    margin: 0;
+}
+
+.alert {
+    margin-bottom: 1rem;
+}

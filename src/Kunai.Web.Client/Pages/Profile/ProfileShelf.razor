@@ -1,0 +1,111 @@
+@using Microsoft.Kiota.Abstractions
+@inject KunaiApiClient Api
+
+<div class="toolbar">
+    <div class="chips" role="group" aria-label="Türe göre süz">
+        <button type="button" class="chip @(_type is null ? "active" : null)" aria-pressed="@(_type is null ? "true" : "false")"
+                disabled="@_loading" @onclick="() => FilterAsync(null)">Tümü</button>
+        @foreach (var type in Enum.GetValues<ItemType>())
+        {
+            <button type="button" class="chip @(_type == type ? "active" : null)" aria-pressed="@(_type == type ? "true" : "false")"
+                    disabled="@_loading" @onclick="() => FilterAsync(type)">@CatalogMetadata.TypeName(type)</button>
+        }
+    </div>
+    @if (_total is not null)
+    {
+        <span class="muted small">@ProfileFormat.Number(_total) içerik</span>
+    }
+</div>
+
+<ProblemAlert Problem="_problem" />
+
+@if (_items is null)
+{
+    @if (_problem is null)
+    {
+        <Spinner Label="Raf yükleniyor…" />
+    }
+}
+else if (_items.Count == 0)
+{
+    <EmptyState Message="@(_type is null ? "Raf henüz boş." : "Bu türde içerik yok.")" />
+}
+else
+{
+    <div class="card-grid">
+        @foreach (var entry in _items)
+        {
+            <ItemCard Href="@($"items/{entry.Item?.Id}")" Title="@(entry.Item?.Title ?? string.Empty)" Type="entry.Item?.Type" Year="entry.Item?.Year" CoverUrl="@entry.Item?.CoverUrl">
+                <StatusBadge Type="entry.Item?.Type" Status="entry.Status" />
+                @if (entry.Rating is not null)
+                {
+                    <span class="rating small"><span aria-hidden="true">★</span><span class="visually-hidden">Puan:</span> @entry.Rating/10</span>
+                }
+            </ItemCard>
+        }
+    </div>
+
+    @if (_cursor is not null)
+    {
+        <div class="more">
+            <button type="button" class="button button--ghost" disabled="@_loading" @onclick="LoadMoreAsync">
+                @(_loading ? "Yükleniyor…" : "Daha fazla")
+            </button>
+        </div>
+    }
+}
+
+@code {
+    private const int PageSize = 24;
+    private List<ShelfEntryResponse>? _items;
+    private ItemType? _type;
+    private string? _cursor;
+    private int? _total;
+    private bool _loading;
+    private ApiProblem? _problem;
+
+    [Parameter, EditorRequired]
+    public string Username { get; set; } = string.Empty;
+
+    protected override Task OnInitializedAsync() => LoadAsync(reset: true);
+
+    private Task FilterAsync(ItemType? type)
+    {
+        _type = type;
+        return LoadAsync(reset: true);
+    }
+
+    private Task LoadMoreAsync() => LoadAsync(reset: false);
+
+    private async Task LoadAsync(bool reset)
+    {
+        _loading = true;
+        _problem = null;
+        if (reset)
+        {
+            _items = null;
+            _cursor = null;
+        }
+
+        try
+        {
+            var page = await Api.Api.V1.Users[Username].Shelf.GetAsync(c =>
+            {
+                c.QueryParameters.Type = _type is { } type ? CatalogMetadata.QueryValue(type) : null;
+                c.QueryParameters.Cursor = _cursor;
+                c.QueryParameters.Limit = PageSize;
+            });
+            _items = [.. _items ?? [], .. page?.Items ?? []];
+            _cursor = page?.NextCursor;
+            _total = page?.TotalCount;
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        {
+            _problem = ApiProblem.From(exception);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

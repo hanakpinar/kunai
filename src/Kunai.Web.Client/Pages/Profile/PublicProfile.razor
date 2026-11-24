@@ -1,0 +1,175 @@
+@page "/u/{Username}"
+@using Microsoft.Kiota.Abstractions
+@inject KunaiApiClient Api
+@inject AuthSession Session
+
+<PageTitle>@PageTitleText</PageTitle>
+
+@if (_notFound)
+{
+    <h1 class="visually-hidden">Profil bulunamadı</h1>
+    <EmptyState Message="Bu kullanıcı yok ya da profili gizli.">
+        <a class="button" href="">Ana sayfaya dön</a>
+    </EmptyState>
+}
+else if (_problem is not null)
+{
+    <h1 class="visually-hidden">Profil</h1>
+    <ProblemAlert Problem="_problem" />
+}
+else if (_profile is null)
+{
+    <Spinner Label="Profil yükleniyor…" />
+}
+else
+{
+    <div @key="_profile.Username">
+        <ProfileHeader Profile="_profile" IsOwner="_isOwner" />
+
+        <section class="section" aria-labelledby="profile-summary-title">
+            <h2 id="profile-summary-title">Bitirilenler</h2>
+            @if (_completed.Count == 0)
+            {
+                <EmptyState Message="Henüz bitirilen bir şey yok. İlk hedef yolda!" />
+            }
+            else
+            {
+                <div class="stat-grid">
+                    @foreach (var count in _completed)
+                    {
+                        <div class="stat">
+                            <div class="stat__value">@ProfileFormat.Number(count.Completed)</div>
+                            <div class="stat__label">@CatalogMetadata.TypeName(count.Type)</div>
+                        </div>
+                    }
+                    <div class="stat stat--year">
+                        <div class="stat__value">@ProfileFormat.Number(_thisYearTotal)</div>
+                        <div class="stat__label">@(_profile.ThisYear?.Year) yılında</div>
+                    </div>
+                </div>
+            }
+        </section>
+
+        <section class="section" aria-labelledby="profile-favorites-title">
+            <h2 id="profile-favorites-title">Favoriler</h2>
+            @if (_profile.Favorites is not { Count: > 0 } favorites)
+            {
+                <EmptyState Message="Henüz favori yok." />
+            }
+            else
+            {
+                <div class="card-grid">
+                    @foreach (var item in favorites)
+                    {
+                        <ItemCard Href="@($"items/{item.Id}")" Title="@(item.Title ?? string.Empty)" Type="item.Type" Year="item.Year"
+                                  Subtitle="@(string.Join(", ", item.Creators?.Take(2) ?? []))" CoverUrl="@item.CoverUrl" />
+                    }
+                </div>
+            }
+        </section>
+
+        <section class="section" aria-labelledby="profile-tabs-title">
+            <h2 id="profile-tabs-title" class="visually-hidden">Raf, istatistikler ve görevler</h2>
+            <div class="tabs" role="tablist">
+                @foreach (var (tab, label) in Tabs)
+                {
+                    <button type="button" role="tab" id="@($"tab-{tab}")" aria-controls="@($"panel-{tab}")"
+                            aria-selected="@(_tab == tab ? "true" : "false")" class="@(_tab == tab ? "active" : null)"
+                            @onclick="() => Select(tab)">@label</button>
+                }
+            </div>
+
+            @foreach (var tab in _opened)
+            {
+                <div role="tabpanel" id="@($"panel-{tab}")" aria-labelledby="@($"tab-{tab}")" hidden="@(_tab != tab)">
+                    @switch (tab)
+                    {
+                        case ProfileTab.Shelf:
+                            <ProfileShelf Username="@_profile.Username" />
+                            break;
+                        case ProfileTab.Stats:
+                            <ProfileStats Username="@_profile.Username" />
+                            break;
+                        default:
+                            <ProfileGoals Username="@_profile.Username" Year="_goalYear" IsOwner="_isOwner" IsSignedIn="_isSignedIn" />
+                            break;
+                    }
+                </div>
+            }
+        </section>
+
+        <BeltGuide Current="_profile.Rank" />
+    </div>
+}
+
+@code {
+    private static readonly (ProfileTab Tab, string Label)[] Tabs =
+        [(ProfileTab.Shelf, "Raf"), (ProfileTab.Stats, "İstatistikler"), (ProfileTab.Goals, "Görevler")];
+
+    private readonly List<ProfileTab> _opened = [];
+    private PublicProfileResponse? _profile;
+    private List<TypeCounts> _completed = [];
+    private int _thisYearTotal;
+    private int _goalYear;
+    private ApiProblem? _problem;
+    private bool _notFound;
+    private bool _isOwner;
+    private bool _isSignedIn;
+    private string? _loadedFor;
+    private ProfileTab _tab;
+
+    [Parameter]
+    public string Username { get; set; } = string.Empty;
+
+    private string PageTitleText => _profile is null ? "Profil · Kunai" : $"{_profile.DisplayName} (@{_profile.Username}) · Kunai";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // The same page instance is reused when navigating from one profile to another.
+        if (string.Equals(_loadedFor, Username, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _loadedFor = Username;
+        _profile = null;
+        _problem = null;
+        _notFound = false;
+        _opened.Clear();
+        Select(ProfileTab.Shelf);
+        try
+        {
+            await Session.GetAuthenticationStateAsync();
+            var profile = await Api.Api.V1.Users[Username].GetAsync();
+            _isSignedIn = Session.Me is not null;
+            _isOwner = string.Equals(Session.Me?.Username, profile?.Username, StringComparison.OrdinalIgnoreCase);
+            _completed = [.. profile?.Counts?.Where(c => c.Completed > 0) ?? []];
+            _thisYearTotal = profile?.ThisYear?.Completed?.Sum(c => c.Count ?? 0) ?? 0;
+            _goalYear = profile?.ThisYear?.Year ?? DateTime.Now.Year;
+            _profile = profile;
+            _notFound = profile is null;
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        {
+            var problem = ApiProblem.From(exception);
+            _notFound = problem.Status == 404;
+            _problem = _notFound ? null : problem;
+        }
+    }
+
+    private void Select(ProfileTab tab)
+    {
+        _tab = tab;
+        if (!_opened.Contains(tab))
+        {
+            _opened.Add(tab);
+        }
+    }
+
+    private enum ProfileTab
+    {
+        Shelf,
+        Stats,
+        Goals,
+    }
+}

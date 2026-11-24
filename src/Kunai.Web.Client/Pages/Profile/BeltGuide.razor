@@ -1,0 +1,77 @@
+@using Microsoft.Kiota.Abstractions
+@inject KunaiApiClient Api
+@inject CatalogMetadata Catalog
+
+<section class="section belt-guide" aria-labelledby="belt-guide-title">
+    <h2 id="belt-guide-title">Kuşaklar</h2>
+    <p class="muted">Bitirdiğin her içerik puan kazandırır. Puanın biriktikçe kuşağın yükselir: beyazdan siyaha.</p>
+
+    <ProblemAlert Problem="_problem" />
+
+    @if (_belts is null)
+    {
+        @if (_problem is null)
+        {
+            <Spinner Label="Kuşaklar yükleniyor…" />
+        }
+    }
+    else
+    {
+        @if (_points.Count > 0)
+        {
+            <p class="points small">
+                @foreach (var (type, points) in _points)
+                {
+                    <span>@CatalogMetadata.TypeName(type): @points puan</span>
+                }
+            </p>
+        }
+
+        <ol class="belts">
+            @foreach (var belt in _belts)
+            {
+                var current = string.Equals(belt.Code, Current?.Code, StringComparison.Ordinal);
+                <li class="@(current ? "belts__item belts__item--current" : "belts__item")" aria-current="@(current ? "true" : null)">
+                    <span class="belt belt--@belt.Code" style="@KnotColor(belt.Color)">
+                        <span class="belt__knot" aria-hidden="true"></span>
+                        @belt.Label?.Tr
+                    </span>
+                    <span class="muted small">@ProfileFormat.Number(belt.MinPoints)+ puan</span>
+                    @if (current)
+                    {
+                        <span class="small belts__here">Buradasın</span>
+                    }
+                </li>
+            }
+        </ol>
+    }
+</section>
+
+@code {
+    private List<Belt>? _belts;
+    private List<(ItemType? Type, int Points)> _points = [];
+    private ApiProblem? _problem;
+
+    /// <summary>The viewed user's belt, highlighted in the list.</summary>
+    [Parameter]
+    public RankResponse? Current { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var belts = Api.Api.V1.Ranks.GetAsync();
+            var types = Catalog.GetAsync();
+            _belts = [.. (await belts ?? []).OrderBy(b => b.MinPoints)];
+            _points = [.. (await types)?.Types?.Where(t => t.RankPoints is > 0).Select(t => (t.Type, t.RankPoints ?? 0)) ?? []];
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        {
+            _problem = ApiProblem.From(exception);
+        }
+    }
+
+    // The API's paint for the belt; only a plain hex color reaches the style attribute.
+    private static string? KnotColor(string? color) =>
+        color is ['#', .. var digits] && digits.Length is >= 3 and <= 8 && digits.All(char.IsAsciiHexDigit) ? $"--belt-color: {color}" : null;
+}

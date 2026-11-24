@@ -1,0 +1,72 @@
+@using Microsoft.Kiota.Abstractions
+@inject KunaiApiClient Api
+
+<EditForm Model="_form" OnValidSubmit="SaveAsync" class="form card goals-form">
+    <h3>@Year görevlerin</h3>
+    <p class="muted small">Bu yıl her türden kaç tane bitirmek istiyorsun? Boş bıraktığın tür görevsiz kalır.</p>
+
+    <div class="goals-form__grid">
+        @foreach (var row in _form.Rows)
+        {
+            <label class="field">
+                <span>@CatalogMetadata.TypeName(row.Type)</span>
+                <InputNumber @bind-Value="row.Target" min="@GoalsForm.MinTarget" max="@GoalsForm.MaxTarget" placeholder="Görev yok"
+                             id="@($"goal-{CatalogMetadata.QueryValue(row.Type)}")" />
+                <ValidationMessage For="() => row.Target" />
+            </label>
+        }
+    </div>
+
+    <ProblemAlert Problem="_problem" />
+
+    <div class="goals-form__actions">
+        <button type="button" class="button button--ghost" disabled="@_busy" @onclick="OnCancel">Vazgeç</button>
+        <button type="submit" class="button" disabled="@_busy">@(_busy ? "Kaydediliyor…" : "Görevleri kaydet")</button>
+    </div>
+</EditForm>
+
+@code {
+    private GoalsForm _form = new();
+    private ApiProblem? _problem;
+    private bool _busy;
+
+    [Parameter, EditorRequired]
+    public int Year { get; set; }
+
+    /// <summary>The year's current goals, to prefill the boxes.</summary>
+    [Parameter]
+    public IEnumerable<GoalProgress>? Goals { get; set; }
+
+    [Parameter]
+    public EventCallback<GoalsResponse> OnSaved { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    protected override void OnInitialized() => _form = GoalsForm.From(Goals);
+
+    private async Task SaveAsync()
+    {
+        if (!_form.IsValid)
+        {
+            _problem = new ApiProblem("target_out_of_range", ErrorMessages.For("target_out_of_range"), new Dictionary<string, string>(StringComparer.Ordinal), 0);
+            return;
+        }
+
+        _busy = true;
+        _problem = null;
+        try
+        {
+            var saved = await Api.Api.V1.Me.Goals[Year].PutAsync(_form.ToRequest());
+            await OnSaved.InvokeAsync(saved ?? new GoalsResponse { Year = Year, Goals = [] });
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        {
+            _problem = ApiProblem.From(exception);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

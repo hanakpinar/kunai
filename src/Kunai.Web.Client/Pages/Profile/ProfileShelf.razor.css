@@ -1,0 +1,14 @@
+.toolbar {
+    justify-content: space-between;
+}
+
+.rating {
+    color: var(--warning);
+    font-weight: 700;
+}
+
+.more {
+    display: flex;
+    justify-content: center;
+    margin-top: 1.5rem;
+}

@@ -1,0 +1,38 @@
+.profile-header {
+    align-items: flex-start;
+}
+
+.profile-header__name {
+    flex: 1 1 280px;
+    min-width: 0;
+}
+
+.profile-header__name h1,
+.profile-header__name p {
+    margin: 0;
+}
+
+.handle {
+    font-weight: 600;
+}
+
+.bio {
+    max-width: 60ch;
+    white-space: pre-line;
+}
+
+.rank {
+    display: grid;
+    gap: 0.4rem;
+    justify-items: start;
+    max-width: 360px;
+    margin-top: 0.5rem;
+}
+
+.rank .progress {
+    width: 100%;
+}
+
+.profile-header__edit {
+    align-self: flex-start;
+}

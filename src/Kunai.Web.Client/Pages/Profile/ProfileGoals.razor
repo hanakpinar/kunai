@@ -1,0 +1,141 @@
+@using System.Globalization
+@using Microsoft.Kiota.Abstractions
+@inject KunaiApiClient Api
+
+<div class="toolbar">
+    <label class="year">
+        <span>Yıl</span>
+        <select id="goals-year" value="@_year" disabled="@(_loading || _editing)" @onchange="ChangeYearAsync">
+            @foreach (var year in Years)
+            {
+                <option value="@year">@year</option>
+            }
+        </select>
+    </label>
+    @if (IsOwner && !_editing && _goals is not null)
+    {
+        <button type="button" class="button button--small" disabled="@_loading" @onclick="StartEditing">Görevleri düzenle</button>
+    }
+</div>
+
+<ProblemAlert Problem="_problem" />
+@if (_saved)
+{
+    <p class="alert alert--success" role="status">Görevler kaydedildi. Hedefe kilitlen!</p>
+}
+
+@if (_editing)
+{
+    <GoalsEditor Year="_year" Goals="_goals?.Goals" OnSaved="Saved" OnCancel="() => _editing = false" />
+}
+else if (_goals is null)
+{
+    @if (_problem is null)
+    {
+        <Spinner Label="Görevler yükleniyor…" />
+    }
+}
+else if (_goals.Goals is not { Count: > 0 } goals)
+{
+    <EmptyState Message="@(IsOwner ? $"{_year} için henüz görev koymadın. Bir hedef seç, kuşağını sık!" : $"{_year} için görev yok.")" />
+}
+else
+{
+    <ul class="goals">
+        @foreach (var goal in goals)
+        {
+            var percent = Math.Clamp(goal.Percent ?? 0, 0, 100);
+            <li class="card goal">
+                <div class="goal__head">
+                    <h3>@CatalogMetadata.TypeName(goal.Type)</h3>
+                    <span class="goal__count">@ProfileFormat.Number(goal.Completed) / @ProfileFormat.Number(goal.Target)</span>
+                </div>
+                <div class="progress" role="progressbar" aria-label="@($"{CatalogMetadata.TypeName(goal.Type)} görevi")"
+                     aria-valuemin="0" aria-valuemax="100" aria-valuenow="@percent">
+                    <div class="progress__bar" style="@ProfileFormat.Width(percent)"></div>
+                </div>
+                <p class="muted small">@(percent >= 100 ? "Görev tamam! Hedef vuruldu." : string.Create(CultureInfo.InvariantCulture, $"%{percent} tamamlandı"))</p>
+            </li>
+        }
+    </ul>
+}
+
+@if (!IsSignedIn)
+{
+    <p class="muted small">Kendi görevlerini koymak için <a href="register">rafını kur</a> ya da <a href="login">giriş yap</a>.</p>
+}
+
+@code {
+    private GoalsResponse? _goals;
+    private ApiProblem? _problem;
+    private bool _loading;
+    private bool _editing;
+    private bool _saved;
+    private int _year;
+
+    [Parameter, EditorRequired]
+    public string Username { get; set; } = string.Empty;
+
+    /// <summary>The profile owner's current year (in their time zone).</summary>
+    [Parameter, EditorRequired]
+    public int Year { get; set; }
+
+    [Parameter]
+    public bool IsOwner { get; set; }
+
+    [Parameter]
+    public bool IsSignedIn { get; set; }
+
+    // Next year too, so missions can be set before New Year's Eve.
+    private IEnumerable<int> Years => Enumerable.Range(Year - 2, 4).Where(y => y is >= 2000 and <= 2100).OrderDescending();
+
+    protected override Task OnInitializedAsync()
+    {
+        _year = Year;
+        return LoadAsync();
+    }
+
+    private Task ChangeYearAsync(ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var year))
+        {
+            return Task.CompletedTask;
+        }
+
+        _year = year;
+        return LoadAsync();
+    }
+
+    private void StartEditing()
+    {
+        _saved = false;
+        _editing = true;
+    }
+
+    private void Saved(GoalsResponse goals)
+    {
+        _goals = goals;
+        _editing = false;
+        _saved = true;
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _problem = null;
+        _saved = false;
+        _goals = null;
+        try
+        {
+            _goals = await Api.Api.V1.Users[Username].Goals[_year].GetAsync();
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        {
+            _problem = ApiProblem.From(exception);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

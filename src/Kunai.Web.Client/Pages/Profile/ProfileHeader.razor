@@ -1,0 +1,52 @@
+<header class="profile-header">
+    <UserAvatar Url="@Profile.AvatarUrl" Alt="@($"{Profile.DisplayName} adlı ninjanın avatarı")" Size="lg" />
+
+    <div class="profile-header__name">
+        <h1>@Profile.DisplayName</h1>
+        <p class="handle muted">@($"@{Profile.Username}")</p>
+        @if (!string.IsNullOrWhiteSpace(Profile.Bio))
+        {
+            <p class="bio">@Profile.Bio</p>
+        }
+        <p class="muted small">Katılım: @ProfileFormat.Date(Profile.JoinedAt)</p>
+
+        @if (Profile.Rank is { } rank)
+        {
+            <div class="rank">
+                <BeltBadge Rank="rank" />
+                @if (rank.NextCode is null)
+                {
+                    <div class="progress" role="progressbar" aria-label="Kuşak ilerlemesi" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+                        <div class="progress__bar" style="@ProfileFormat.Width(100)"></div>
+                    </div>
+                    <p class="small rank__note">Siyah kuşak: zirvedesin</p>
+                }
+                else
+                {
+                    <div class="progress" role="progressbar" aria-label="Sonraki kuşağa ilerleme"
+                         aria-valuemin="0" aria-valuemax="@rank.NextAt" aria-valuenow="@rank.Points">
+                        <div class="progress__bar" style="@ProfileFormat.Width(ProfileFormat.Percent(rank.Points, rank.NextAt))"></div>
+                    </div>
+                    <p class="small muted rank__note">
+                        @ProfileFormat.Number(rank.Points) / @ProfileFormat.Number(rank.NextAt) puan · sonraki kuşağa @ProfileFormat.Number(PointsLeft(rank)) puan kaldı
+                    </p>
+                }
+            </div>
+        }
+    </div>
+
+    @if (IsOwner)
+    {
+        <a class="button button--ghost button--small profile-header__edit" href="settings">Profili düzenle</a>
+    }
+</header>
+
+@code {
+    [Parameter, EditorRequired]
+    public PublicProfileResponse Profile { get; set; } = default!;
+
+    [Parameter]
+    public bool IsOwner { get; set; }
+
+    private static int PointsLeft(RankResponse rank) => Math.Max(0, (rank.NextAt ?? 0) - (rank.Points ?? 0));
+}
