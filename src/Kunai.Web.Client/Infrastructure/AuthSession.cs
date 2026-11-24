@@ -44,11 +44,15 @@ public sealed class AuthSession(KunaiApiClient api) : AuthenticationStateProvide
     }
 
     /// <summary>Reloads the current user, e.g. after a profile or settings change.</summary>
-    public Task RefreshAsync()
+    /// <remarks>
+    /// Loads first and then notifies with a finished task. A pending task would make AuthorizeRouteView show its
+    /// "authorizing" content for a moment, which disposes and recreates the current page and loses its state.
+    /// </remarks>
+    public async Task RefreshAsync()
     {
-        _state = LoadAsync();
+        var state = await LoadAsync();
+        _state = Task.FromResult(state);
         NotifyAuthenticationStateChanged(_state);
-        return _state;
     }
 
     private async Task<AuthenticationState> LoadAsync()
@@ -60,6 +64,10 @@ public sealed class AuthSession(KunaiApiClient api) : AuthenticationStateProvide
         catch (ApiException)
         {
             Me = null;
+        }
+        catch (HttpRequestException)
+        {
+            // The API is unreachable: keep whoever was signed in (anonymous on a cold start) instead of failing the router.
         }
 
         if (Me is null)

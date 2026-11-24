@@ -16,6 +16,12 @@ public sealed class FakeApi : HttpMessageHandler
 
     public ConcurrentQueue<(HttpMethod Method, string PathAndQuery, string? Body)> Requests { get; } = new();
 
+    /// <summary>
+    /// When true, every answer arrives after a yield, the way a browser's fetch does. Use it to catch code that only
+    /// works because the fake answers synchronously (assert with WaitForAssertion / WaitForState).
+    /// </summary>
+    public bool AnswerAsynchronously { get; set; }
+
     /// <summary>Answers <paramref name="method"/> requests to <paramref name="path"/> (no query string) with JSON.</summary>
     public FakeApi On(HttpMethod method, string path, object? body, HttpStatusCode status = HttpStatusCode.OK)
     {
@@ -36,6 +42,11 @@ public sealed class FakeApi : HttpMessageHandler
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var body = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
+        if (AnswerAsynchronously)
+        {
+            await Task.Yield();
+        }
+
         Requests.Enqueue((request.Method, request.RequestUri!.PathAndQuery, body));
         return _routes.TryGetValue(Key(request.Method, request.RequestUri.AbsolutePath), out var respond)
             ? respond(request)

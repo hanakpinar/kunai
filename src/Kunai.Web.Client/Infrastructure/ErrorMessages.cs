@@ -61,6 +61,18 @@ public static class ErrorMessages
         ["title_length"] = "Başlık 1-500 karakter olmalı.",
         ["target_out_of_range"] = "Hedef 1 ile 10000 arasında olmalı.",
         ["duplicate_type"] = "Her tür bir kez seçilebilir.",
+        ["page_count_out_of_range"] = "Sayfa sayısı 1 ile 100.000 arasında olmalı.",
+        ["limit_out_of_range"] = "Geçersiz sayfa boyutu.",
+        ["invalid_cursor"] = "Liste değişti. Sayfayı yenileyip tekrar dene.",
+        ["status_invalid"] = "Geçersiz durum filtresi.",
+        ["sort_invalid"] = "Geçersiz sıralama.",
+        ["avatar_not_found"] = "Avatar bulunamadı.",
+        ["item_not_pending"] = "Bu kitap zaten incelendi.",
+        ["invalid_refresh_token"] = "Oturumun sona erdi. Tekrar giriş yap.",
+        ["csrf_header_missing"] = "Güvenlik kontrolü başarısız oldu. Sayfayı yenileyip tekrar dene.",
+        ["method_not_allowed"] = "İstek anlaşılamadı.",
+        ["unsupported_media_type"] = "İstek anlaşılamadı.",
+        ["business_rule_violated"] = "Bu işlem şu an yapılamıyor.",
     };
 
     public static string For(string code) => Messages.TryGetValue(code, out var message) ? message : "Bir şeyler ters gitti.";

@@ -11,7 +11,24 @@ public sealed class CatalogMetadata(KunaiApiClient api)
 {
     private Task<ItemTypesResponse?>? _types;
 
-    public Task<ItemTypesResponse?> GetAsync() => _types ??= api.Api.V1.ItemTypes.GetAsync();
+    /// <summary>The registry, fetched once per session. A failed fetch is forgotten so the next call retries.</summary>
+    public async Task<ItemTypesResponse?> GetAsync()
+    {
+        var load = _types ??= api.Api.V1.ItemTypes.GetAsync();
+        try
+        {
+            return await load;
+        }
+        catch
+        {
+            if (ReferenceEquals(_types, load))
+            {
+                _types = null;
+            }
+
+            throw;
+        }
+    }
 
     public async Task<ItemTypeDefinition?> ForAsync(ItemType? type) =>
         (await GetAsync())?.Types?.FirstOrDefault(t => t.Type == type);
