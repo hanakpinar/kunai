@@ -11,6 +11,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Kunai.Web.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../Kunai.Web.Client/Kunai.Web.Client.csproj" />
     <ProjectReference Include="../Kunai.ServiceDefaults/Kunai.ServiceDefaults.csproj" />
   </ItemGroup>

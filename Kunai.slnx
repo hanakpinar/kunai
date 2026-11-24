@@ -11,5 +11,6 @@
     <Project Path="tests/Kunai.Api.UnitTests/Kunai.Api.UnitTests.csproj" />
     <Project Path="tests/Kunai.ArchitectureTests/Kunai.ArchitectureTests.csproj" />
     <Project Path="tests/Kunai.Web.Client.Tests/Kunai.Web.Client.Tests.csproj" />
+    <Project Path="tests/Kunai.Web.Tests/Kunai.Web.Tests.csproj" />
   </Folder>
 </Solution>

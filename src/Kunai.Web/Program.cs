@@ -42,8 +42,12 @@ app.UseAntiforgery();
 app.MapDefaultEndpoints();
 app.MapReverseProxy();
 app.MapStaticAssets();
+// Pages render only in the browser, which decides who may see them ([Authorize] -> /login) and the API enforces
+// access to the data. This host has no authentication, so it must serve the shell for every route; otherwise a
+// page's [Authorize] makes the server try to challenge and answer 500 on a reload or deep link.
 app.MapRazorComponents<App>()
     .AddInteractiveWebAssemblyRenderMode()
-    .AddAdditionalAssemblies(typeof(Kunai.Web.Client._Imports).Assembly);
+    .AddAdditionalAssemblies(typeof(Kunai.Web.Client._Imports).Assembly)
+    .AllowAnonymous();
 
 await app.RunAsync();
