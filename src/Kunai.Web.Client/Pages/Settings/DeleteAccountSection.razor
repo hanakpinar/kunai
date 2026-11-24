@@ -1,0 +1,53 @@
+@inherits SettingsSection
+@inject NavigationManager Navigation
+
+<section class="card settings-card danger-zone" aria-labelledby="settings-delete">
+    <h2 id="settings-delete">Hesabı sil</h2>
+    <p>Hesabın, rafın, görevlerin ve bütün oturumların kalıcı olarak silinir. Geri dönüşü yok.</p>
+
+    <EditForm Model="_form" OnValidSubmit="DeleteAsync" class="form">
+        <DataAnnotationsValidator />
+        <label class="field">
+            <span>Şifren</span>
+            <InputText type="password" @bind-Value="_form.Password" autocomplete="current-password" />
+            <ValidationMessage For="() => _form.Password" />
+            <FieldError Problem="Problem" Field="password" />
+        </label>
+        <label class="check">
+            <InputCheckbox @bind-Value="_form.Confirmed" />
+            <span>Bu işlem geri alınamaz</span>
+        </label>
+        <ValidationMessage For="() => _form.Confirmed" />
+
+        <SectionFeedback Problem="AlertProblem(PasswordField)" />
+
+        <div class="settings-card__actions">
+            <button type="submit" class="button button--danger" disabled="@(Busy || !_form.Confirmed)">Hesabımı kalıcı olarak sil</button>
+        </div>
+    </EditForm>
+</section>
+
+@code {
+    private const string PasswordField = "password";
+    private readonly DeleteAccountForm _form = new();
+
+    private async Task DeleteAsync()
+    {
+        if (!await SendAsync(() => Api.Api.V1.Me.DeleteAsync(new DeleteAccountRequest { Password = _form.Password })))
+        {
+            return;
+        }
+
+        // The API has already ended the session; forget it here too and leave the signed-in area.
+        try
+        {
+            await Session.LogoutAsync();
+        }
+        catch (HttpRequestException)
+        {
+            // Offline right after the deletion: the next GET /me finds no session anyway.
+        }
+
+        Navigation.NavigateTo(string.Empty, replace: true);
+    }
+}

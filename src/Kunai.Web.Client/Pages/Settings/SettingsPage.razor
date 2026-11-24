@@ -1,0 +1,67 @@
+@page "/settings"
+@attribute [Authorize]
+@using Microsoft.Kiota.Abstractions
+@inject KunaiApiClient Api
+
+<PageTitle>Ayarlar · Kunai</PageTitle>
+
+<div class="settings">
+    <header class="settings__header">
+        <h1>Ayarlar</h1>
+        <p class="muted">Profilini, tercihlerini ve hesabını buradan yönet.</p>
+        @if (_me is not null)
+        {
+            <p class="muted small">Giriş e-postan: <strong>@_me.Email</strong></p>
+        }
+    </header>
+
+    @if (_loading)
+    {
+        <Spinner Label="Ayarların yükleniyor…" />
+    }
+    else if (_problem is not null)
+    {
+        <ProblemAlert Problem="_problem" />
+        <div>
+            <button type="button" class="button button--ghost" @onclick="LoadAsync">Tekrar dene</button>
+        </div>
+    }
+    else if (_me is null)
+    {
+        <EmptyState Message="Hesap bilgilerine şu an ulaşamadık." />
+    }
+    else
+    {
+        <ProfileSection @bind-Me="_me" />
+        <PreferencesSection @bind-Me="_me" />
+        <UsernameSection @bind-Me="_me" />
+        <PasswordSection Me="_me" />
+        <DeleteAccountSection Me="_me" />
+    }
+</div>
+
+@code {
+    private MeResponse? _me;
+    private ApiProblem? _problem;
+    private bool _loading;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _problem = null;
+        try
+        {
+            _me = await Api.Api.V1.Me.GetAsync();
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        {
+            _problem = ApiProblem.From(exception);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

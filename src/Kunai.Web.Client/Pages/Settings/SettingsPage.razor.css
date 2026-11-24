@@ -1,0 +1,28 @@
+.settings {
+    display: grid;
+    gap: 1.5rem;
+    max-width: 760px;
+    margin: 0 auto;
+}
+
+.settings__header p {
+    margin: 0;
+}
+
+/* The cards are rendered by the section components; lay them out the same way. */
+.settings ::deep .settings-card {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.settings ::deep .settings-card > h2,
+.settings ::deep .settings-card > p {
+    margin: 0;
+}
+
+.settings ::deep .settings-card__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+}

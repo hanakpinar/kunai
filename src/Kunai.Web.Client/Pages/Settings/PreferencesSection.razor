@@ -1,0 +1,92 @@
+@inherits SettingsSection
+
+<section class="card settings-card" aria-labelledby="settings-preferences">
+    <h2 id="settings-preferences">Görünüm ve tercihler</h2>
+
+    <EditForm Model="_form" OnValidSubmit="SubmitAsync" class="form">
+        <div class="field">
+            <label class="check">
+                <InputCheckbox @bind-Value="_form.IsProfilePublic" aria-describedby="settings-visibility-hint" />
+                <span>Profilim herkese açık</span>
+            </label>
+            <small id="settings-visibility-hint" class="muted">
+                Gizli profiller başkalarına “bulunamadı” olarak görünür; rafını, kuşağını ve görevlerini yalnızca sen görürsün.
+            </small>
+        </div>
+
+        <div class="field-row">
+            <label class="field">
+                <span>Dil</span>
+                <InputSelect @bind-Value="_form.Locale">
+                    <option value="tr">Türkçe</option>
+                    <option value="en">English</option>
+                </InputSelect>
+                <FieldError Problem="Problem" Field="locale" />
+            </label>
+            <label class="field">
+                <span>Saat dilimi</span>
+                <InputSelect @bind-Value="_form.TimeZone">
+                    @foreach (var (id, name) in _timeZones)
+                    {
+                        <option value="@id">@name</option>
+                    }
+                </InputSelect>
+                <small class="muted">“Bu yıl” sayıların ve görevlerin bu saat dilimine göre hesaplanır.</small>
+                <FieldError Problem="Problem" Field="timeZone" />
+            </label>
+        </div>
+
+        <AvatarPicker @bind-Value="_form.AvatarId" />
+        <FieldError Problem="Problem" Field="avatarId" />
+
+        <SectionFeedback Problem="AlertProblem(LocaleField, TimeZoneField, AvatarField)" Success="@Success" />
+
+        <div class="settings-card__actions">
+            <button type="submit" class="button" disabled="@Busy">Tercihleri kaydet</button>
+        </div>
+    </EditForm>
+</section>
+
+@code {
+    private const string LocaleField = "locale";
+    private const string TimeZoneField = "timeZone";
+    private const string AvatarField = "avatarId";
+
+    private static readonly (string Id, string Name)[] CommonTimeZones =
+    [
+        ("Europe/Istanbul", "İstanbul (Europe/Istanbul)"),
+        ("Europe/London", "Londra (Europe/London)"),
+        ("Europe/Berlin", "Berlin (Europe/Berlin)"),
+        ("America/New_York", "New York (America/New_York)"),
+        ("America/Los_Angeles", "Los Angeles (America/Los_Angeles)"),
+        ("Asia/Tokyo", "Tokyo (Asia/Tokyo)"),
+    ];
+
+    private readonly PreferencesForm _form = new();
+    private (string Id, string Name)[] _timeZones = CommonTimeZones;
+
+    protected override void OnInitialized()
+    {
+        _form.IsProfilePublic = Me.IsProfilePublic ?? true;
+        _form.Locale = Me.Locale ?? _form.Locale;
+        _form.TimeZone = Me.TimeZone ?? _form.TimeZone;
+        _form.AvatarId = Me.AvatarId ?? _form.AvatarId;
+
+        // Keep a zone chosen elsewhere (e.g. on the phone) selectable instead of silently replacing it.
+        if (!CommonTimeZones.Any(zone => string.Equals(zone.Id, _form.TimeZone, StringComparison.Ordinal)))
+        {
+            _timeZones = [(_form.TimeZone, _form.TimeZone), .. CommonTimeZones];
+        }
+    }
+
+    private Task SubmitAsync() =>
+        SaveAsync(
+            () => Api.Api.V1.Me.Settings.PutAsync(new SettingsRequest
+            {
+                IsProfilePublic = _form.IsProfilePublic,
+                Locale = _form.Locale,
+                TimeZone = _form.TimeZone,
+                AvatarId = _form.AvatarId,
+            }),
+            "Tercihlerin kaydedildi.");
+}

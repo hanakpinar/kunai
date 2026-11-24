@@ -1,0 +1,8 @@
+.danger-zone {
+    border-color: rgb(230 57 70 / 0.5);
+    background: linear-gradient(180deg, rgb(230 57 70 / 0.07), transparent 55%), var(--surface);
+}
+
+.danger-zone h2 {
+    color: #ff8a94;
+}

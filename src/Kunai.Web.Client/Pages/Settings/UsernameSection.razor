@@ -1,0 +1,45 @@
+@inherits SettingsSection
+@inject NavigationManager Navigation
+
+<section class="card settings-card" aria-labelledby="settings-username">
+    <h2 id="settings-username">Kullanıcı adı</h2>
+    <p class="muted">
+        Profil adresin: <a href="@ProfilePath">@Navigation.ToAbsoluteUri(ProfilePath)</a>
+    </p>
+    <p class="muted small">
+        Kullanıcı adını 30 günde bir değiştirebilirsin. Değiştirdiğinde profil adresin de değişir; eski bağlantıyı paylaştıysan yenisini gönder.
+    </p>
+
+    <EditForm Model="_form" OnValidSubmit="SubmitAsync" class="form">
+        <DataAnnotationsValidator />
+        <label class="field">
+            <span>Yeni kullanıcı adı</span>
+            <InputText @bind-Value="_form.Username" @bind-Value:after="Normalize" autocomplete="username" spellcheck="false" />
+            <small class="muted">3-24 karakter: küçük harf, rakam ve alt çizgi; harfle başlar.</small>
+            <ValidationMessage For="() => _form.Username" />
+            <FieldError Problem="Problem" Field="username" />
+        </label>
+
+        <SectionFeedback Problem="AlertProblem(UsernameField)" Success="@Success" />
+
+        <div class="settings-card__actions">
+            <button type="submit" class="button" disabled="@Busy">Kullanıcı adını değiştir</button>
+        </div>
+    </EditForm>
+</section>
+
+@code {
+    private const string UsernameField = "username";
+    private readonly UsernameForm _form = new();
+
+    private string ProfilePath => $"u/{Me.Username}";
+
+    protected override void OnInitialized() => _form.Username = Me.Username ?? string.Empty;
+
+    private void Normalize() => _form.Username = _form.Username.Trim().ToLowerInvariant();
+
+    private Task SubmitAsync() =>
+        SaveAsync(
+            () => Api.Api.V1.Me.Username.PutAsync(new UsernameRequest { Username = _form.Username }),
+            $"Tamamdır, artık @{_form.Username} olarak görünüyorsun.");
+}

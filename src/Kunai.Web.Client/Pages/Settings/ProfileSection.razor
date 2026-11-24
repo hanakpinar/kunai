@@ -1,0 +1,56 @@
+@inherits SettingsSection
+
+<section class="card settings-card" aria-labelledby="settings-profile">
+    <h2 id="settings-profile">Profil</h2>
+    <p class="muted">Profilinde görünen adın ve kendini anlattığın kısa yazı.</p>
+
+    <EditForm Model="_form" OnValidSubmit="SubmitAsync" class="form">
+        <DataAnnotationsValidator />
+        <label class="field">
+            <span>Görünen ad</span>
+            <InputText @bind-Value="_form.DisplayName" maxlength="@ProfileForm.DisplayNameMaxLength" autocomplete="nickname" />
+            <ValidationMessage For="() => _form.DisplayName" />
+            <FieldError Problem="Problem" Field="displayName" />
+        </label>
+        @* An explicit label: the live counter stays out of the textarea's accessible name. *@
+        <div class="field">
+            <label for="settings-bio" class="field-label">Hakkımda <small class="muted">(isteğe bağlı)</small></label>
+            <textarea id="settings-bio" @bind="_form.Bio" @bind:event="oninput" rows="4" maxlength="@ProfileForm.BioMaxLength"
+                      aria-describedby="settings-bio-counter" placeholder="Bitirmeden bırakmayan bir okur…"></textarea>
+            <small id="settings-bio-counter" class="counter @(BioLength >= ProfileForm.BioMaxLength - 20 ? "counter--near" : null)">
+                @BioLength/@ProfileForm.BioMaxLength karakter
+            </small>
+            <ValidationMessage For="() => _form.Bio" />
+            <FieldError Problem="Problem" Field="bio" />
+        </div>
+
+        <SectionFeedback Problem="AlertProblem(DisplayNameField, BioField)" Success="@Success" />
+
+        <div class="settings-card__actions">
+            <button type="submit" class="button" disabled="@Busy">Profili kaydet</button>
+        </div>
+    </EditForm>
+</section>
+
+@code {
+    private const string DisplayNameField = "displayName";
+    private const string BioField = "bio";
+    private readonly ProfileForm _form = new();
+
+    private int BioLength => _form.Bio?.Length ?? 0;
+
+    protected override void OnInitialized()
+    {
+        _form.DisplayName = Me.DisplayName ?? string.Empty;
+        _form.Bio = Me.Bio;
+    }
+
+    private Task SubmitAsync() =>
+        SaveAsync(
+            () => Api.Api.V1.Me.Profile.PutAsync(new ProfileRequest
+            {
+                DisplayName = _form.DisplayName.Trim(),
+                Bio = string.IsNullOrWhiteSpace(_form.Bio) ? null : _form.Bio.Trim(),
+            }),
+            "Profilin kaydedildi.");
+}

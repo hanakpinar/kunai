@@ -1,0 +1,35 @@
+@* Radio buttons in disguise: arrow keys move between ninjas, the selected one is framed and ticked. *@
+<fieldset class="avatar-picker">
+    <legend>Avatarın</legend>
+    <div class="avatar-picker__grid">
+        @foreach (var id in AvatarIds)
+        {
+            var selected = string.Equals(id, Value, StringComparison.Ordinal);
+            <label class="avatar-picker__option @(selected ? "avatar-picker__option--selected" : null)">
+                <input type="radio" name="settings-avatar" value="@id" class="visually-hidden" checked="@selected" @onchange="() => SelectAsync(id)" />
+                <UserAvatar AvatarId="@id" Alt="@($"Ninja {id[^2..]}")" />
+                @if (selected)
+                {
+                    <span class="avatar-picker__tick" aria-hidden="true">✓</span>
+                }
+            </label>
+        }
+    </div>
+</fieldset>
+
+@code {
+    /// <summary>The avatars the API accepts in PUT /me/settings.</summary>
+    public static IReadOnlyList<string> AvatarIds { get; } =
+    [
+        "ninja-01", "ninja-02", "ninja-03", "ninja-04", "ninja-05", "ninja-06",
+        "ninja-07", "ninja-08", "ninja-09", "ninja-10", "ninja-11", "ninja-12",
+    ];
+
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<string> ValueChanged { get; set; }
+
+    private Task SelectAsync(string id) => ValueChanged.InvokeAsync(id);
+}
