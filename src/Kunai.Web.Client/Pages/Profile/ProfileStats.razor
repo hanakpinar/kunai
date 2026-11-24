@@ -2,7 +2,7 @@
 @using Microsoft.Kiota.Abstractions
 @inject KunaiApiClient Api
 
-<ProblemAlert Problem="_problem" />
+<LoadProblem Problem="_problem" Busy="_loading" OnRetry="RetryAsync" />
 
 @if (_stats is null)
 {
@@ -16,7 +16,7 @@ else
     <div class="toolbar">
         <label class="year">
             <span>Yıl</span>
-            <select id="stats-year" value="@_stats.Year" disabled="@_loading" @onchange="ChangeYearAsync">
+            <select id="stats-year" value="@_selectedYear" disabled="@_loading" @onchange="ChangeYearAsync">
                 @foreach (var year in Years)
                 {
                     <option value="@year">@year</option>
@@ -90,6 +90,13 @@ else
     private ApiProblem? _problem;
     private bool _loading;
 
+    // The year the select shows: the one on screen, or the one being loaded. Rendering this instead of _stats.Year
+    // makes a failed change render a different value, so Blazor moves the select back to the year still on screen.
+    private int? _selectedYear;
+
+    // The year of the last request, for Tekrar dene (null: the API's default, the owner's current year).
+    private int? _requestedYear;
+
     [Parameter, EditorRequired]
     public string Username { get; set; } = string.Empty;
 
@@ -109,17 +116,24 @@ else
     private Task ChangeYearAsync(ChangeEventArgs args) =>
         int.TryParse(args.Value?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var year) ? LoadAsync(year) : Task.CompletedTask;
 
+    private Task RetryAsync() => LoadAsync(_requestedYear);
+
     private async Task LoadAsync(int? year)
     {
         _loading = true;
         _problem = null;
+        _requestedYear = year;
+        _selectedYear = year ?? _selectedYear;
         try
         {
             _stats = await Api.Api.V1.Users[Username].Stats.GetAsync(c => c.QueryParameters.Year = year);
+            _selectedYear = _stats?.Year;
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
         {
+            // The cards still show the previous year (if any): put the select back on it.
             _problem = ApiProblem.From(exception);
+            _selectedYear = _stats?.Year;
         }
         finally
         {

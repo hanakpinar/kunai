@@ -1,7 +1,7 @@
 @page "/u/{Username}"
+@implements IDisposable
 @using Microsoft.Kiota.Abstractions
 @inject KunaiApiClient Api
-@inject AuthSession Session
 
 <PageTitle>@PageTitleText</PageTitle>
 
@@ -15,7 +15,7 @@
 else if (_problem is not null)
 {
     <h1 class="visually-hidden">Profil</h1>
-    <ProblemAlert Problem="_problem" />
+    <LoadProblem Problem="_problem" Busy="_loading" OnRetry="LoadAsync" />
 }
 else if (_profile is null)
 {
@@ -70,29 +70,38 @@ else
 
         <section class="section" aria-labelledby="profile-tabs-title">
             <h2 id="profile-tabs-title" class="visually-hidden">Raf, istatistikler ve görevler</h2>
-            <div class="tabs" role="tablist">
-                @foreach (var (tab, label) in Tabs)
+            @* The ARIA tabs pattern: only the selected tab is in the Tab order; arrows, Home and End move between the tabs. *@
+            <div class="tabs" role="tablist" aria-labelledby="profile-tabs-title" @onkeydown="MoveBetweenTabsAsync">
+                @for (var index = 0; index < Tabs.Length; index++)
                 {
-                    <button type="button" role="tab" id="@($"tab-{tab}")" aria-controls="@($"panel-{tab}")"
-                            aria-selected="@(_tab == tab ? "true" : "false")" class="@(_tab == tab ? "active" : null)"
+                    var position = index;
+                    var (tab, label) = Tabs[position];
+                    var selected = _tab == tab;
+                    <button type="button" role="tab" id="@TabId(tab)" aria-controls="@PanelId(tab)" aria-selected="@(selected ? "true" : "false")"
+                            tabindex="@(selected ? 0 : -1)" class="@(selected ? "active" : null)" @ref="_tabButtons[position]"
                             @onclick="() => Select(tab)">@label</button>
                 }
             </div>
 
-            @foreach (var tab in _opened)
+            @* Every panel is always there, so aria-controls always resolves. Its content mounts the first time its tab
+               is opened and then stays, so switching back keeps the loaded shelf, year and filters. *@
+            @foreach (var (tab, _) in Tabs)
             {
-                <div role="tabpanel" id="@($"panel-{tab}")" aria-labelledby="@($"tab-{tab}")" hidden="@(_tab != tab)">
-                    @switch (tab)
+                <div role="tabpanel" id="@PanelId(tab)" aria-labelledby="@TabId(tab)" hidden="@(_tab != tab)">
+                    @if (_opened.Contains(tab))
                     {
-                        case ProfileTab.Shelf:
-                            <ProfileShelf Username="@_profile.Username" />
-                            break;
-                        case ProfileTab.Stats:
-                            <ProfileStats Username="@_profile.Username" />
-                            break;
-                        default:
-                            <ProfileGoals Username="@_profile.Username" Year="_goalYear" IsOwner="_isOwner" IsSignedIn="_isSignedIn" />
-                            break;
+                        @switch (tab)
+                        {
+                            case ProfileTab.Shelf:
+                                <ProfileShelf Username="@_profile.Username" />
+                                break;
+                            case ProfileTab.Stats:
+                                <ProfileStats Username="@_profile.Username" />
+                                break;
+                            default:
+                                <ProfileGoals Username="@_profile.Username" Year="_goalYear" IsOwner="_isOwner" IsSignedIn="_isSignedIn" />
+                                break;
+                        }
                     }
                 </div>
             }
@@ -106,13 +115,16 @@ else
     private static readonly (ProfileTab Tab, string Label)[] Tabs =
         [(ProfileTab.Shelf, "Raf"), (ProfileTab.Stats, "İstatistikler"), (ProfileTab.Goals, "Görevler")];
 
-    private readonly List<ProfileTab> _opened = [];
+    private readonly HashSet<ProfileTab> _opened = [];
+    private readonly ElementReference[] _tabButtons = new ElementReference[Tabs.Length];
+    private CancellationTokenSource? _cancel;
     private PublicProfileResponse? _profile;
     private List<TypeCounts> _completed = [];
     private int _thisYearTotal;
     private int _goalYear;
     private ApiProblem? _problem;
     private bool _notFound;
+    private bool _loading;
     private bool _isOwner;
     private bool _isSignedIn;
     private string? _loadedFor;
@@ -121,49 +133,134 @@ else
     [Parameter]
     public string Username { get; set; } = string.Empty;
 
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
     private string PageTitleText => _profile is null ? "Profil · Kunai" : $"{_profile.DisplayName} (@{_profile.Username}) · Kunai";
 
     protected override async Task OnParametersSetAsync()
     {
-        // The same page instance is reused when navigating from one profile to another.
         if (string.Equals(_loadedFor, Username, StringComparison.Ordinal))
         {
+            // Same profile, new session (signed out, or it ended): only the owner's controls change.
+            ShowViewer(await ViewerAsync());
             return;
         }
 
+        // The same page instance is reused when navigating from one profile to another: start over on the Raf tab.
         _loadedFor = Username;
+        _opened.Clear();
+        Select(ProfileTab.Shelf);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        // Blazor does not wait for an earlier OnParametersSetAsync: a load for the previous profile may still be
+        // running. Cancel it, and ignore whatever it answers, so the newest profile always wins.
+        var previous = _cancel;
+        _cancel = new CancellationTokenSource();
+        var token = _cancel.Token;
+        var username = Username;
         _profile = null;
         _problem = null;
         _notFound = false;
-        _opened.Clear();
-        Select(ProfileTab.Shelf);
+        _loading = true;
         try
         {
-            await Session.GetAuthenticationStateAsync();
-            var profile = await Api.Api.V1.Users[Username].GetAsync();
-            _isSignedIn = Session.Me is not null;
-            _isOwner = string.Equals(Session.Me?.Username, profile?.Username, StringComparison.OrdinalIgnoreCase);
+            if (previous is not null)
+            {
+                await previous.CancelAsync();
+                previous.Dispose();
+            }
+
+            var profile = await Api.Api.V1.Users[username].GetAsync(cancellationToken: token);
+            var viewer = await ViewerAsync();
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
             _completed = [.. profile?.Counts?.Where(c => c.Completed > 0) ?? []];
             _thisYearTotal = profile?.ThisYear?.Completed?.Sum(c => c.Count ?? 0) ?? 0;
             _goalYear = profile?.ThisYear?.Year ?? DateTime.Now.Year;
             _profile = profile;
             _notFound = profile is null;
+            ShowViewer(viewer);
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        catch (Exception exception) when (exception is ApiException or HttpRequestException or OperationCanceledException)
         {
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
             var problem = ApiProblem.From(exception);
             _notFound = problem.Status == 404;
             _problem = _notFound ? null : problem;
         }
+        finally
+        {
+            if (!token.IsCancellationRequested)
+            {
+                _loading = false;
+            }
+        }
+    }
+
+    /// <summary>The signed-in user's username, or null for a visitor.</summary>
+    private async Task<string?> ViewerAsync()
+    {
+        if (AuthState is null)
+        {
+            return null;
+        }
+
+        var user = (await AuthState).User;
+        return user.Identity is { IsAuthenticated: true, Name: { } name } ? name : null;
+    }
+
+    private void ShowViewer(string? viewer)
+    {
+        _isSignedIn = viewer is not null;
+        _isOwner = viewer is not null && string.Equals(viewer, _profile?.Username, StringComparison.OrdinalIgnoreCase);
     }
 
     private void Select(ProfileTab tab)
     {
         _tab = tab;
-        if (!_opened.Contains(tab))
+        _opened.Add(tab);
+    }
+
+    // Arrows wrap around; the newly selected tab takes the focus (selection follows focus).
+    private async Task MoveBetweenTabsAsync(KeyboardEventArgs args)
+    {
+        var current = Array.FindIndex(Tabs, t => t.Tab == _tab);
+        var next = args.Key switch
         {
-            _opened.Add(tab);
+            "ArrowRight" => (current + 1) % Tabs.Length,
+            "ArrowLeft" => (current + Tabs.Length - 1) % Tabs.Length,
+            "Home" => 0,
+            "End" => Tabs.Length - 1,
+            _ => -1,
+        };
+        if (next < 0)
+        {
+            return;
         }
+
+        Select(Tabs[next].Tab);
+        await _tabButtons[next].FocusAsync();
+    }
+
+    private static string TabId(ProfileTab tab) => $"tab-{tab}";
+
+    private static string PanelId(ProfileTab tab) => $"panel-{tab}";
+
+    public void Dispose()
+    {
+        _cancel?.Cancel();
+        _cancel?.Dispose();
     }
 
     private enum ProfileTab

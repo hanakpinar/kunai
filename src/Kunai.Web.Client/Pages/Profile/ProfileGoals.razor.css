@@ -44,6 +44,7 @@
     margin: 0;
 }
 
+/* The success message is written here; a failed load's alert gets its spacing from LoadProblem. */
 .alert {
     margin-bottom: 1rem;
 }

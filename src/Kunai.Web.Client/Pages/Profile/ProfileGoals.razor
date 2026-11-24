@@ -18,7 +18,7 @@
     }
 </div>
 
-<ProblemAlert Problem="_problem" />
+<LoadProblem Problem="_problem" Busy="_loading" OnRetry="LoadAsync" />
 @if (_saved)
 {
     <p class="alert alert--success" role="status">Görevler kaydedildi. Hedefe kilitlen!</p>
@@ -129,7 +129,7 @@ else
         {
             _goals = await Api.Api.V1.Users[Username].Goals[_year].GetAsync();
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
         {
             _problem = ApiProblem.From(exception);
         }

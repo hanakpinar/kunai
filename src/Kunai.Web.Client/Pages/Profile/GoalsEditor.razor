@@ -1,16 +1,20 @@
 @using Microsoft.Kiota.Abstractions
 @inject KunaiApiClient Api
+@inject AuthSession Session
+@inject NavigationManager Navigation
 
 <EditForm Model="_form" OnValidSubmit="SaveAsync" class="form card goals-form">
     <h3>@Year görevlerin</h3>
-    <p class="muted small">Bu yıl her türden kaç tane bitirmek istiyorsun? Boş bıraktığın tür görevsiz kalır.</p>
+    <p class="muted small">@Year yılında her türden kaç tane bitirmek istiyorsun? Boş bıraktığın tür görevsiz kalır.</p>
 
     <div class="goals-form__grid">
         @foreach (var row in _form.Rows)
         {
             <label class="field">
                 <span>@CatalogMetadata.TypeName(row.Type)</span>
-                <InputNumber @bind-Value="row.Target" min="@GoalsForm.MinTarget" max="@GoalsForm.MaxTarget" placeholder="Görev yok"
+                @* A number box also takes 1.5 or 1e3, which are not whole numbers: say so in Turkish ({0} is the type). *@
+                <InputNumber @bind-Value="row.Target" DisplayName="@CatalogMetadata.TypeName(row.Type)" ParsingErrorMessage="{0} hedefi bir tam sayı olmalı."
+                             min="@GoalsForm.MinTarget" max="@GoalsForm.MaxTarget" step="1" inputmode="numeric" placeholder="Görev yok"
                              id="@($"goal-{CatalogMetadata.QueryValue(row.Type)}")" />
                 <ValidationMessage For="() => row.Target" />
             </label>
@@ -18,6 +22,10 @@
     </div>
 
     <ProblemAlert Problem="_problem" />
+    @if (_problem?.Status == 401)
+    {
+        <p class="small"><a href="@LoginHref">Giriş yap</a>, sonra görevlerini yeniden kaydet.</p>
+    }
 
     <div class="goals-form__actions">
         <button type="button" class="button button--ghost" disabled="@_busy" @onclick="OnCancel">Vazgeç</button>
@@ -43,13 +51,17 @@
     [Parameter]
     public EventCallback OnCancel { get; set; }
 
+    // Back to this profile after signing in again.
+    private string LoginHref => $"login?returnUrl={Uri.EscapeDataString(Navigation.ToBaseRelativePath(Navigation.Uri))}";
+
     protected override void OnInitialized() => _form = GoalsForm.From(Goals);
 
     private async Task SaveAsync()
     {
         if (!_form.IsValid)
         {
-            _problem = new ApiProblem("target_out_of_range", ErrorMessages.For("target_out_of_range"), new Dictionary<string, string>(StringComparer.Ordinal), 0);
+            // Caught before sending, like the API's 400 would be: nothing to retry.
+            _problem = new ApiProblem("target_out_of_range", ErrorMessages.For("target_out_of_range"), new Dictionary<string, string>(StringComparer.Ordinal), 400);
             return;
         }
 
@@ -60,13 +72,30 @@
             var saved = await Api.Api.V1.Me.Goals[Year].PutAsync(_form.ToRequest());
             await OnSaved.InvokeAsync(saved ?? new GoalsResponse { Year = Year, Goals = [] });
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
         {
             _problem = ApiProblem.From(exception);
+            if (_problem.Status == 401)
+            {
+                await ReloadSessionAsync();
+            }
         }
         finally
         {
             _busy = false;
+        }
+    }
+
+    // The session has ended: reload it, so the header and the profile stop offering what only the signed-in owner can do.
+    private async Task ReloadSessionAsync()
+    {
+        try
+        {
+            await Session.RefreshAsync();
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
+        {
+            // The message and the sign-in link already show; the header catches up on the next page load.
         }
     }
 }

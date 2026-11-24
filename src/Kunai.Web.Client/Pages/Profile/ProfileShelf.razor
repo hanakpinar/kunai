@@ -17,7 +17,7 @@
     }
 </div>
 
-<ProblemAlert Problem="_problem" />
+<LoadProblem Problem="_problem" Busy="_loading" OnRetry="RetryAsync" />
 
 @if (_items is null)
 {
@@ -77,14 +77,19 @@ else
 
     private Task LoadMoreAsync() => LoadAsync(reset: false);
 
+    // No items yet: the first page (of this filter) failed. Otherwise "Daha fazla" did, and its cursor is still kept.
+    private Task RetryAsync() => LoadAsync(reset: _items is null);
+
     private async Task LoadAsync(bool reset)
     {
         _loading = true;
         _problem = null;
         if (reset)
         {
+            // A new filter starts from its first page; the count belongs to the old filter too.
             _items = null;
             _cursor = null;
+            _total = null;
         }
 
         try
@@ -99,7 +104,7 @@ else
             _cursor = page?.NextCursor;
             _total = page?.TotalCount;
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
         {
             _problem = ApiProblem.From(exception);
         }

@@ -1,0 +1,10 @@
+/* Written here, so the spacing reaches ProblemAlert's .alert, which another component renders. */
+.load-problem {
+    display: grid;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.load-problem .button {
+    justify-self: start;
+}

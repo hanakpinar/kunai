@@ -6,7 +6,7 @@
     <h2 id="belt-guide-title">Kuşaklar</h2>
     <p class="muted">Bitirdiğin her içerik puan kazandırır. Puanın biriktikçe kuşağın yükselir: beyazdan siyaha.</p>
 
-    <ProblemAlert Problem="_problem" />
+    <LoadProblem Problem="_problem" Busy="_loading" OnRetry="LoadAsync" />
 
     @if (_belts is null)
     {
@@ -51,27 +51,39 @@
     private List<Belt>? _belts;
     private List<(ItemType? Type, int Points)> _points = [];
     private ApiProblem? _problem;
+    private bool _loading;
 
     /// <summary>The viewed user's belt, highlighted in the list.</summary>
     [Parameter]
     public RankResponse? Current { get; set; }
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
     {
+        _loading = true;
+        _problem = null;
         try
         {
             var belts = Api.Api.V1.Ranks.GetAsync();
             var types = Catalog.GetAsync();
+            // Both are awaited, so a failure of one never leaves the other's unobserved.
+            await Task.WhenAll(belts, types);
             _belts = [.. (await belts ?? []).OrderBy(b => b.MinPoints)];
             _points = [.. (await types)?.Types?.Where(t => t.RankPoints is > 0).Select(t => (t.Type, t.RankPoints ?? 0)) ?? []];
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
         {
             _problem = ApiProblem.From(exception);
         }
+        finally
+        {
+            _loading = false;
+        }
     }
 
-    // The API's paint for the belt; only a plain hex color reaches the style attribute.
+    // The API's paint for the belt. Only a CSS hex color (#RGB, #RGBA, #RRGGBB or #RRGGBBAA) reaches the style
+    // attribute; anything else (#12345 too) keeps the belt--{code} class color instead of an invalid, see-through knot.
     private static string? KnotColor(string? color) =>
-        color is ['#', .. var digits] && digits.Length is >= 3 and <= 8 && digits.All(char.IsAsciiHexDigit) ? $"--belt-color: {color}" : null;
+        color is ['#', .. var digits] && digits.Length is 3 or 4 or 6 or 8 && digits.All(char.IsAsciiHexDigit) ? $"--belt-color: {color}" : null;
 }

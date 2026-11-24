@@ -1,0 +1,24 @@
+@* A failed load on the profile pages: the API's message, with room below it, and a retry when trying again can help. *@
+@if (Problem is not null)
+{
+    <div class="load-problem">
+        <ProblemAlert Problem="Problem" />
+        @if (Problem.IsRetryable)
+        {
+            <button type="button" class="button button--ghost" disabled="@Busy" @onclick="OnRetry">Tekrar dene</button>
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public ApiProblem? Problem { get; set; }
+
+    /// <summary>Loads again; shown only for a network, rate-limit or server error.</summary>
+    [Parameter, EditorRequired]
+    public EventCallback OnRetry { get; set; }
+
+    /// <summary>True while a load runs, so the retry cannot be sent twice.</summary>
+    [Parameter]
+    public bool Busy { get; set; }
+}
