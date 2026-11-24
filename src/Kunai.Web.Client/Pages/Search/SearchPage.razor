@@ -1,0 +1,192 @@
+@page "/search"
+@implements IDisposable
+@using Microsoft.Kiota.Abstractions
+@inject KunaiApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>@(_query.Length > 0 ? $"{_query} · Ara" : "Ara") · Kunai</PageTitle>
+
+<section class="search">
+    <header class="search__header">
+        <h1>@(_query.Length > 0 ? $"“{_query}” için sonuçlar" : "Yeni bir hedef bul")</h1>
+        <form class="search__form" role="search" @onsubmit="Submit">
+            <label class="visually-hidden" for="search-text">Aranacak kelime</label>
+            <input id="search-text" type="search" @bind="_text" placeholder="Başlık, yazar, yönetmen…" minlength="2" maxlength="100" />
+            <button type="submit" class="button">Ara</button>
+        </form>
+    </header>
+
+    <nav class="tabs" aria-label="Tür">
+        @foreach (var type in SearchQuery.Types)
+        {
+            <a href="@SearchQuery.Url(_query, type)" class="@(type == _type ? "active" : null)" aria-current="@(type == _type ? "page" : null)">@CatalogMetadata.TypeName(type)</a>
+        }
+    </nav>
+
+    @if (_query.Length < 2)
+    {
+        <EmptyState Message="@(_query.Length == 0 ? "Ne okuyorsun, ne izliyorsun, ne oynuyorsun? Hedefini yaz, gerisini Kunai bulsun." : "Aramak için en az 2 karakter yaz.")" />
+    }
+    else if (_hits.Count == 0 && _loading)
+    {
+        <Spinner Label="Aranıyor…" />
+    }
+    else if (_hits.Count == 0 && _problem is not null)
+    {
+        <ProblemAlert Problem="_problem" />
+        <p class="search__retry">
+            <button type="button" class="button button--ghost" disabled="@_loading" @onclick="RetryAsync">Tekrar dene</button>
+        </p>
+    }
+    else if (_hits.Count == 0)
+    {
+        <EmptyState Message="@($"“{_query}” için bir şey bulamadık. Başka bir kelime ya da tür dene.")">
+            @if (_type == ItemType.Book)
+            {
+                <a class="button" href="items/new">Kitabı elle ekle</a>
+            }
+        </EmptyState>
+    }
+    else
+    {
+        <div class="card-grid">
+            @foreach (var hit in _hits)
+            {
+                <ItemCard @key="hit" Href="@SearchQuery.ItemUrl(hit)" Title="@(hit.Title ?? string.Empty)" Type="hit.Type" Year="hit.Year" Subtitle="@hit.Subtitle" CoverUrl="@hit.CoverUrl">
+                    <SearchHitActions Hit="hit" SignedIn="_signedIn" ReturnPath="@SearchQuery.Url(_query, _type)" OnImported="StateHasChanged" />
+                </ItemCard>
+            }
+        </div>
+
+        <footer class="search__more">
+            <ProblemAlert Problem="_problem" />
+            @if (_problem is not null)
+            {
+                <button type="button" class="button button--ghost" disabled="@_loading" @onclick="RetryAsync">Tekrar dene</button>
+            }
+            else if (_nextCursor is not null)
+            {
+                <button type="button" class="button button--ghost" disabled="@_loading" @onclick="LoadMoreAsync">@(_loading ? "Yükleniyor…" : "Daha fazla")</button>
+            }
+        </footer>
+    }
+
+    @if (_type == ItemType.Book && _hits.Count > 0)
+    {
+        <p class="search__manual">Aradığını bulamadın mı? <a href="items/new">Elle ekle</a></p>
+    }
+</section>
+
+@code {
+    private readonly List<SearchItem> _hits = [];
+    private CancellationTokenSource _cancel = new();
+    private string _query = string.Empty;
+    private string _text = string.Empty;
+    private string? _loadedKey;
+    private string? _nextCursor;
+    private string? _failedCursor;
+    private ItemType _type = ItemType.Book;
+    private ApiProblem? _problem;
+    private bool _loading;
+    private bool _signedIn;
+
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Q { get; set; }
+
+    [SupplyParameterFromQuery(Name = "type")]
+    public string? Type { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _signedIn = AuthState is not null && (await AuthState).User.Identity?.IsAuthenticated == true;
+
+        var query = Q?.Trim() ?? string.Empty;
+        var type = SearchQuery.ParseType(Type);
+        var key = SearchQuery.Url(query, type);
+        if (string.Equals(key, _loadedKey, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        // A new search: drop the old results and stop a request that is still running for them.
+        _loadedKey = key;
+        _query = query;
+        _text = query;
+        _type = type;
+        _hits.Clear();
+        _nextCursor = null;
+        _problem = null;
+        await _cancel.CancelAsync();
+        _cancel.Dispose();
+        _cancel = new CancellationTokenSource();
+        _loading = false;
+
+        if (query.Length >= 2)
+        {
+            await LoadAsync(cursor: null);
+        }
+    }
+
+    private void Submit()
+    {
+        if (_text.Trim().Length >= 2)
+        {
+            Navigation.NavigateTo(SearchQuery.Url(_text.Trim(), _type));
+        }
+    }
+
+    private Task LoadMoreAsync() => LoadAsync(_nextCursor);
+
+    private Task RetryAsync() => LoadAsync(_failedCursor);
+
+    private async Task LoadAsync(string? cursor)
+    {
+        var token = _cancel.Token;
+        _loading = true;
+        _problem = null;
+        try
+        {
+            var page = await Api.Api.V1.Search.GetAsync(
+                request =>
+                {
+                    request.QueryParameters.Q = _query;
+                    request.QueryParameters.Type = CatalogMetadata.QueryValue(_type);
+                    request.QueryParameters.Cursor = cursor;
+                },
+                token);
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _hits.AddRange(page?.Items ?? []);
+            _nextCursor = page?.NextCursor;
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException or OperationCanceledException)
+        {
+            // A cancelled token means a newer search replaced this one: its answer, or failure, no longer matters.
+            // provider_unavailable / provider_not_configured arrive as 503 with their own Turkish text.
+            if (!token.IsCancellationRequested)
+            {
+                _problem = ApiProblem.From(exception);
+                _failedCursor = cursor;
+            }
+        }
+        finally
+        {
+            if (!token.IsCancellationRequested)
+            {
+                _loading = false;
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        _cancel.Cancel();
+        _cancel.Dispose();
+    }
+}

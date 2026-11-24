@@ -1,0 +1,113 @@
+@page "/items/new"
+@attribute [Authorize]
+@using Microsoft.Kiota.Abstractions
+@inject KunaiApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Kitabı elle ekle · Kunai</PageTitle>
+
+<section class="manual-book">
+    <h1>Kitabı elle ekle</h1>
+    <p class="muted">
+        Aramada çıkmayan bir baskı mı var? Bilgilerini gir, katalogdaki yerini al.
+        Bir moderatör onaylayana kadar kitabı yalnızca sen görürsün.
+    </p>
+
+    <EditForm Model="_form" OnValidSubmit="SubmitAsync" class="form card">
+        <DataAnnotationsValidator />
+
+        <label class="field">
+            <span>Kitabın adı</span>
+            <InputText @bind-Value="_form.Title" maxlength="500" />
+            <ValidationMessage For="() => _form.Title" />
+            <FieldError Problem="_problem" Field="title" />
+        </label>
+
+        <label class="field">
+            <span>Yazarlar <small class="muted">(isteğe bağlı)</small></span>
+            <InputText @bind-Value="_form.Authors" placeholder="Orhan Pamuk, Elif Şafak" />
+            <small class="muted">Birden fazla yazarı virgülle ayır.</small>
+            <ValidationMessage For="() => _form.Authors" />
+            <FieldError Problem="_problem" Field="authors" />
+        </label>
+
+        <div class="field-row">
+            <label class="field">
+                <span>Yayın yılı</span>
+                <InputNumber @bind-Value="_form.Year" min="1000" max="3000" ParsingErrorMessage="Yıl bir sayı olmalı." />
+                <ValidationMessage For="() => _form.Year" />
+                <FieldError Problem="_problem" Field="year" />
+            </label>
+            <label class="field">
+                <span>Sayfa sayısı</span>
+                <InputNumber @bind-Value="_form.PageCount" min="1" max="100000" ParsingErrorMessage="Sayfa sayısı bir sayı olmalı." />
+                <ValidationMessage For="() => _form.PageCount" />
+                <FieldError Problem="_problem" Field="pageCount" />
+            </label>
+        </div>
+
+        <label class="field">
+            <span>ISBN-13</span>
+            <InputText @bind-Value="_form.Isbn13" @bind-Value:after="_form.NormalizeIsbn" inputmode="numeric" placeholder="9786050912345" />
+            <small class="muted">Kitabın arka kapağında, barkodun üstünde. Tireler sorun değil.</small>
+            <ValidationMessage For="() => _form.Isbn13" />
+            <FieldError Problem="_problem" Field="isbn13" />
+        </label>
+
+        <label class="field">
+            <span>Yayınevi</span>
+            <InputText @bind-Value="_form.Publisher" maxlength="200" />
+            <ValidationMessage For="() => _form.Publisher" />
+            <FieldError Problem="_problem" Field="publisher" />
+        </label>
+
+        <label class="field">
+            <span>Açıklama</span>
+            <InputTextArea @bind-Value="_form.Description" rows="5" maxlength="5000" placeholder="Arka kapak yazısı ya da kısa bir özet" />
+            <ValidationMessage For="() => _form.Description" />
+            <FieldError Problem="_problem" Field="description" />
+        </label>
+
+        <ProblemAlert Problem="@(_problem is { Fields.Count: 0 } ? _problem : null)" />
+        @if (_existingId is { } existingId)
+        {
+            <p><a class="button button--ghost" href="@($"items/{existingId}")">Katalogdaki kitabı aç</a></p>
+        }
+
+        <div class="manual-book__actions">
+            <a class="button button--ghost" href="search?type=book">Vazgeç</a>
+            <button type="submit" class="button" disabled="@_busy">@(_busy ? "Ekleniyor…" : "Kitabı ekle")</button>
+        </div>
+    </EditForm>
+</section>
+
+@code {
+    private readonly ManualBookForm _form = new();
+    private ApiProblem? _problem;
+    private Guid? _existingId;
+    private bool _busy;
+
+    private async Task SubmitAsync()
+    {
+        _busy = true;
+        _problem = null;
+        _existingId = null;
+        try
+        {
+            var item = await Api.Api.V1.Items.PostAsync(_form.ToRequest());
+            Navigation.NavigateTo($"items/{item?.Id}?added=true");
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        {
+            _problem = ApiProblem.From(exception);
+            if (exception is ProblemDetails { Code: "book_exists" } conflict)
+            {
+                _existingId = ManualBookForm.ExistingBookId(conflict.Detail);
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

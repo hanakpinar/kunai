@@ -1,0 +1,121 @@
+@using Microsoft.Kiota.Abstractions
+@inject KunaiApiClient Api
+
+@if (!SignedIn)
+{
+    <a class="button button--small button--ghost" href="@SearchQuery.LoginUrl(ReturnPath)">Rafa ekle<span class="visually-hidden">: @Hit.Title</span></a>
+}
+else if (_entry is not null)
+{
+    <StatusBadge Type="Hit.Type" Status="_entry.Status" />
+    <button type="button" class="button button--small button--ghost" @onclick="OpenEditor">Düzenle<span class="visually-hidden">: @Hit.Title</span></button>
+}
+else
+{
+    <button type="button" class="button button--small" disabled="@_busy" @onclick="AddAsync">
+        @(_busy ? "Ekleniyor…" : "Rafa ekle")<span class="visually-hidden">: @Hit.Title</span>
+    </button>
+}
+
+@if (_problem is not null)
+{
+    <div class="hit-problem">
+        <ProblemAlert Problem="_problem" />
+    </div>
+}
+
+@if (_editing && Hit.Id is { } itemId)
+{
+    <ShelfEntryEditor ItemId="itemId"
+                      ItemType="Hit.Type"
+                      Title="@(_entry is null ? $"Rafa ekle: {Hit.Title}" : $"Düzenle: {Hit.Title}")"
+                      ProgressTotal="_progressTotal"
+                      Existing="_entry"
+                      OnSaved="OnSaved"
+                      OnRemoved="OnRemoved"
+                      OnCancel="CloseEditor" />
+}
+
+@code {
+    private ShelfEntryResponse? _entry;
+    private ApiProblem? _problem;
+    private int? _progressTotal;
+    private bool _busy;
+    private bool _editing;
+
+    [Parameter, EditorRequired]
+    public SearchItem Hit { get; set; } = default!;
+
+    [Parameter]
+    public bool SignedIn { get; set; }
+
+    /// <summary>Where sign-in should come back to: the current search.</summary>
+    [Parameter]
+    public string ReturnPath { get; set; } = "search";
+
+    /// <summary>Raised after the hit was imported, so the card can link to the new item page.</summary>
+    [Parameter]
+    public EventCallback OnImported { get; set; }
+
+    private async Task AddAsync()
+    {
+        _busy = true;
+        _problem = null;
+        try
+        {
+            if (Hit.Id is null)
+            {
+                // Search hits from a provider have no catalog id yet: import first (safe to repeat), then shelve.
+                var item = await Api.Api.V1.Items.Import.PostAsync(new ImportItemRequest { Ref = Hit.Ref });
+                Hit.Id = item?.Id;
+                _progressTotal = item?.ProgressTotal;
+                await OnImported.InvokeAsync();
+            }
+
+            if (Hit.Id is { } itemId)
+            {
+                // It may be on the shelf already (added elsewhere): edit that entry rather than overwrite it.
+                _entry = await ShelfEntryAsync(itemId);
+                _progressTotal ??= _entry?.Item?.ProgressTotal;
+                _editing = true;
+            }
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        {
+            _problem = ApiProblem.From(exception);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task<ShelfEntryResponse?> ShelfEntryAsync(Guid itemId)
+    {
+        try
+        {
+            return await Api.Api.V1.Me.Shelf[itemId].GetAsync();
+        }
+        catch (ApiException exception) when (exception.ResponseStatusCode == 404)
+        {
+            return null;
+        }
+    }
+
+    private void OpenEditor() => _editing = true;
+
+    private void CloseEditor() => _editing = false;
+
+    private void OnSaved(ShelfEntryResponse saved)
+    {
+        _entry = saved;
+        _progressTotal = saved.Item?.ProgressTotal ?? _progressTotal;
+        _editing = false;
+    }
+
+    private void OnRemoved()
+    {
+        _entry = null;
+        _editing = false;
+    }
+}

@@ -1,0 +1,25 @@
+.shelf-panel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1rem;
+    margin: 1.25rem 0;
+    padding: 1rem 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.shelf-panel__title {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.shelf-panel p { margin: 0; }
+
+.shelf-panel__state { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; flex: 1; }

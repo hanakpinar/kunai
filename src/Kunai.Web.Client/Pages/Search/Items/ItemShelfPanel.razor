@@ -1,0 +1,148 @@
+@using Microsoft.Kiota.Abstractions
+@inject KunaiApiClient Api
+@inject CatalogMetadata Catalog
+
+<section class="shelf-panel" aria-labelledby="shelf-panel-title">
+    <h2 id="shelf-panel-title" class="shelf-panel__title">Rafın</h2>
+
+    @if (!_signedIn)
+    {
+        <p class="muted">Rafına eklemek, puan vermek ve ilerlemeni tutmak için giriş yap.</p>
+        <a class="button" href="@SearchQuery.LoginUrl($"items/{Item.Id}")">Giriş yap</a>
+    }
+    else if (_loading)
+    {
+        <Spinner Label="Rafın kontrol ediliyor…" />
+    }
+    else if (_problem is not null)
+    {
+        <ProblemAlert Problem="_problem" />
+        <button type="button" class="button button--ghost" @onclick="LoadAsync">Tekrar dene</button>
+    }
+    else if (_entry is null)
+    {
+        <p class="muted">Henüz rafında değil. Hedef listene ekle.</p>
+        <button type="button" class="button" @onclick="OpenEditor">Rafa ekle</button>
+    }
+    else
+    {
+        <div class="shelf-panel__state">
+            <StatusBadge Type="Item.Type" Status="_entry.Status" />
+            @if (_entry.Rating is not null)
+            {
+                <span>Puanın: <strong>@_entry.Rating</strong>/10</span>
+            }
+            @if (_entry.Progress is not null)
+            {
+                <span>İlerleme: @ProgressText(_entry.Progress.Value)</span>
+            }
+            @if (_entry.IsFavorite == true)
+            {
+                <span>★ Favorin</span>
+            }
+        </div>
+        <button type="button" class="button button--ghost" @onclick="OpenEditor">Düzenle</button>
+    }
+</section>
+
+@if (_editing && Item.Id is { } itemId)
+{
+    <ShelfEntryEditor ItemId="itemId"
+                      ItemType="Item.Type"
+                      Title="@(_entry is null ? "Rafa ekle" : "Rafını düzenle")"
+                      ProgressTotal="Item.ProgressTotal"
+                      Existing="_entry"
+                      OnSaved="OnSaved"
+                      OnRemoved="OnRemoved"
+                      OnCancel="CloseEditor" />
+}
+
+@code {
+    private ShelfEntryResponse? _entry;
+    private ApiProblem? _problem;
+    private ProgressUnit? _unit;
+    private Guid? _loadedFor;
+    private bool _signedIn;
+    private bool _loading;
+    private bool _editing;
+
+    [Parameter, EditorRequired]
+    public ItemResponse Item { get; set; } = default!;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _signedIn = AuthState is not null && (await AuthState).User.Identity?.IsAuthenticated == true;
+        if (!_signedIn || Item.Id == _loadedFor)
+        {
+            return;
+        }
+
+        _loadedFor = Item.Id;
+        _editing = false;
+        _unit = await ProgressUnitAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _problem = null;
+        try
+        {
+            _entry = await Api.Api.V1.Me.Shelf[Item.Id ?? Guid.Empty].GetAsync();
+        }
+        catch (ApiException exception) when (exception.ResponseStatusCode == 404)
+        {
+            // Not on the shelf yet.
+            _entry = null;
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        {
+            _problem = ApiProblem.From(exception);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    // Only labels the progress ("sayfa", "bölüm"); the entry still shows without it.
+    private async Task<ProgressUnit?> ProgressUnitAsync()
+    {
+        try
+        {
+            return (await Catalog.ForAsync(Item.Type))?.ProgressUnit;
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    private string ProgressText(int progress) => _unit switch
+    {
+        ProgressUnit.Percent => $"%{progress}",
+        _ when Item.ProgressTotal is > 0 => $"{progress} / {Item.ProgressTotal} {CatalogMetadata.ProgressUnitName(_unit)}",
+        _ => $"{progress} {CatalogMetadata.ProgressUnitName(_unit)}",
+    };
+
+    private void OpenEditor() => _editing = true;
+
+    private void CloseEditor() => _editing = false;
+
+    private void OnSaved(ShelfEntryResponse saved)
+    {
+        // The PUT answers with the stored entry: show it as the server has it now.
+        _entry = saved;
+        _editing = false;
+    }
+
+    private void OnRemoved()
+    {
+        _entry = null;
+        _editing = false;
+    }
+}

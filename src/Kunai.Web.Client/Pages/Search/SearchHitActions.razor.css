@@ -1,0 +1,3 @@
+/* An import failure stays next to the card it belongs to, compact enough for a narrow column. */
+.hit-problem { width: 100%; font-size: 0.8rem; }
+.hit-problem ::deep .alert { padding: 0.5rem 0.65rem; }

@@ -1,0 +1,182 @@
+@page "/items/{Id:guid}"
+@using Microsoft.Kiota.Abstractions
+@inject KunaiApiClient Api
+@inject CatalogMetadata Catalog
+
+<PageTitle>@(_item?.Title ?? "İçerik") · Kunai</PageTitle>
+
+@if (_notFound)
+{
+    <h1 class="visually-hidden">İçerik bulunamadı</h1>
+    <EmptyState Message="Bu içerik bulunamadı. Kunai hedefi ıskaladı.">
+        <a class="button" href="">Ana sayfaya dön</a>
+    </EmptyState>
+}
+else if (_problem is not null)
+{
+    <h1 class="visually-hidden">İçerik yüklenemedi</h1>
+    <ProblemAlert Problem="_problem" />
+    <p class="item-retry">
+        <button type="button" class="button button--ghost" disabled="@_loading" @onclick="LoadAsync">Tekrar dene</button>
+    </p>
+}
+else if (_item is null)
+{
+    <Spinner />
+}
+else
+{
+    <article class="detail">
+        <ItemCover Url="@_item.CoverUrl" Title="@(_item.Title ?? string.Empty)" Size="lg" />
+
+        <div class="item-detail">
+            <p class="item-detail__type">@CatalogMetadata.TypeName(_item.Type)</p>
+            <h1>@_item.Title</h1>
+            @if (!string.IsNullOrWhiteSpace(_item.OriginalTitle) && !string.Equals(_item.OriginalTitle, _item.Title, StringComparison.Ordinal))
+            {
+                <p class="item-detail__original">Özgün adı: <span>@_item.OriginalTitle</span></p>
+            }
+
+            <p class="detail__meta">
+                @if (_item.Year is not null)
+                {
+                    <span>@_item.Year</span>
+                }
+                @if (_item.Creators is { Count: > 0 } creators)
+                {
+                    <span>@string.Join(", ", creators)</span>
+                }
+            </p>
+
+            @if (_item.CatalogStatus == CatalogStatus.PendingReview)
+            {
+                <p class="alert @(Added ? "alert--success" : "alert--info")" role="status">
+                    @(Added ? "Kitabı ekledin! " : null)Bu kitap moderatör onayı bekliyor. Onaylanana kadar yalnızca sen görebilir ve rafına ekleyebilirsin.
+                </p>
+            }
+            else if (_item.CatalogStatus == CatalogStatus.Rejected)
+            {
+                <p class="alert alert--error">Bu kitap moderatör tarafından onaylanmadı; katalogda diğer okurlara görünmüyor.</p>
+            }
+
+            <ItemShelfPanel Item="_item" />
+
+            @if (_item.Genres is { Count: > 0 } genres)
+            {
+                <ul class="item-detail__genres" aria-label="Türler">
+                    @foreach (var genre in genres)
+                    {
+                        <li>@genre</li>
+                    }
+                </ul>
+            }
+
+            <h2>Özet</h2>
+            @if (string.IsNullOrWhiteSpace(_item.Description))
+            {
+                <p class="muted">Henüz bir özet yok.</p>
+            }
+            else
+            {
+                <p class="detail__description">@_item.Description</p>
+            }
+
+            @if (_facts.Count > 0)
+            {
+                <h2>Bilgiler</h2>
+                <dl class="item-detail__facts">
+                    @foreach (var fact in _facts)
+                    {
+                        <div>
+                            <dt>@fact.Label</dt>
+                            <dd>@fact.Value</dd>
+                        </div>
+                    }
+                </dl>
+            }
+
+            @if (_attribution is not null)
+            {
+                <p class="item-detail__attribution">
+                    <span>Kaynak: <a href="@_attribution.Url" target="_blank" rel="noopener noreferrer">@_attribution.Name</a></span>
+                    <span>@_attribution.Notice</span>
+                </p>
+            }
+            else if (_item.Source == ItemSource.Manual)
+            {
+                <p class="item-detail__attribution">Bu kitap bir Kunai okuru tarafından elle eklendi.</p>
+            }
+        </div>
+    </article>
+}
+
+@code {
+    private ItemResponse? _item;
+    private IReadOnlyList<ItemFact> _facts = [];
+    private SourceAttribution? _attribution;
+    private ApiProblem? _problem;
+    private Guid? _loadedFor;
+    private bool _notFound;
+    private bool _loading;
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    /// <summary>Set by the manual-add form, to greet the book it just created.</summary>
+    [SupplyParameterFromQuery(Name = "added")]
+    public bool Added { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id == _loadedFor)
+        {
+            return;
+        }
+
+        _loadedFor = Id;
+        _item = null;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _problem = null;
+        _notFound = false;
+        try
+        {
+            var item = await Api.Api.V1.Items[Id].GetAsync();
+            _attribution = await AttributionAsync(item?.Source);
+            _facts = item is null ? [] : ItemFacts.For(item);
+            _item = item;
+            _notFound = item is null;
+        }
+        catch (ApiException exception) when (exception.ResponseStatusCode == 404)
+        {
+            // Unknown id, or someone else's book that is still waiting for review.
+            _notFound = true;
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        {
+            _problem = ApiProblem.From(exception);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    // The provider's notice from GET /item-types; the item still shows if that list cannot be loaded
+    // (the footer carries every provider's attribution as well).
+    private async Task<SourceAttribution?> AttributionAsync(ItemSource? source)
+    {
+        try
+        {
+            return (await Catalog.GetAsync())?.Sources?.FirstOrDefault(s => s.Source == source);
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        {
+            return null;
+        }
+    }
+}

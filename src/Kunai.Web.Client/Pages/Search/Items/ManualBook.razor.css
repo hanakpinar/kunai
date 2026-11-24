@@ -1,0 +1,5 @@
+.manual-book { width: min(640px, 100%); margin: 0 auto; }
+
+.manual-book > p { margin-bottom: 1.5rem; }
+
+.manual-book__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.75rem; }
