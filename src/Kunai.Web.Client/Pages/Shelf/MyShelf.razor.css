@@ -1,0 +1,39 @@
+.shelf-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.shelf-header p {
+    margin: 0;
+}
+
+.shelf-header__count {
+    color: var(--muted);
+    font-weight: 700;
+}
+
+.shelf-notice {
+    margin: 0 0 1.25rem;
+}
+
+.shelf-retry {
+    margin-top: 1rem;
+}
+
+.shelf-empty-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+}
+
+.shelf-more {
+    display: grid;
+    justify-items: center;
+    gap: 1rem;
+    margin-top: 2rem;
+}

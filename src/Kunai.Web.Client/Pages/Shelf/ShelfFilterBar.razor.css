@@ -1,0 +1,27 @@
+.shelf-filters .tabs {
+    margin-bottom: 1rem;
+}
+
+.shelf-filters__favorite span {
+    color: var(--accent-strong);
+}
+
+.shelf-filters__field {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.shelf-filters__field select {
+    width: auto;
+    padding: 0.4rem 0.6rem;
+}
+
+@media (max-width: 720px) {
+    .shelf-filters .spacer {
+        display: none;
+    }
+}

@@ -1,0 +1,227 @@
+@page "/shelf"
+@attribute [Authorize]
+@implements IDisposable
+@using Microsoft.Kiota.Abstractions
+@inject KunaiApiClient Api
+@inject CatalogMetadata Catalog
+@inject NavigationManager Navigation
+
+<PageTitle>Rafım · Kunai</PageTitle>
+
+<header class="shelf-header">
+    <div>
+        <h1>Rafım</h1>
+        <p class="muted">Okuduğun, izlediğin, oynadığın her şey; tüm hedeflerin tek rafta.</p>
+    </div>
+    <p class="shelf-header__count" aria-live="polite">@(_totalCount is { } total ? $"{total} içerik" : string.Empty)</p>
+</header>
+
+<ShelfFilterBar Filter="_filter" StatusOptions="_statusOptions" OnChange="ApplyAsync" />
+
+@if (_notice is not null)
+{
+    <p class="alert alert--success shelf-notice" role="status">@_notice</p>
+}
+
+<section aria-labelledby="shelf-results-title">
+    <h2 id="shelf-results-title" class="visually-hidden">Raftaki içerikler</h2>
+
+    @if (_entries is null)
+    {
+        @if (_problem is null)
+        {
+            <Spinner />
+        }
+        else
+        {
+            <ProblemAlert Problem="_problem" />
+            <button type="button" class="button button--ghost shelf-retry" @onclick="ReloadAsync">Tekrar dene</button>
+        }
+    }
+    else if (_entries.Count == 0)
+    {
+        <EmptyState Message="@(_filter.IsFiltered ? "Bu filtrelere uyan bir şey yok. Hedefi biraz genişletmeye ne dersin?" : "Rafın henüz boş. Bir içerik bul, ilk hedefini rafına ekle.")">
+            <div class="shelf-empty-actions">
+                <a class="button" href="@SearchHref">İçerik ara</a>
+                @if (_filter.IsFiltered)
+                {
+                    <button type="button" class="button button--ghost" @onclick="ClearAsync">Filtreleri temizle</button>
+                }
+            </div>
+        </EmptyState>
+    }
+    else
+    {
+        <div class="card-grid">
+            @foreach (var entry in _entries)
+            {
+                <ShelfEntryCard @key="entry" Entry="entry" OnEdit="() => Edit(entry)" />
+            }
+        </div>
+
+        @if (_problem is not null || _nextCursor is not null)
+        {
+            <div class="shelf-more">
+                <ProblemAlert Problem="_problem" />
+                @if (_nextCursor is not null)
+                {
+                    <button type="button" class="button button--ghost" disabled="@_loadingMore" @onclick="LoadMoreAsync">@(_loadingMore ? "Yükleniyor…" : "Daha fazla")</button>
+                }
+            </div>
+        }
+    }
+</section>
+
+@if (_editing is { Item: { } item })
+{
+    <ShelfEntryEditor @key="_editing" ItemId="item.Id ?? Guid.Empty" ItemType="item.Type" Title="@(item.Title ?? "Düzenle")"
+                      ProgressTotal="item.ProgressTotal" Existing="_editing"
+                      OnSaved="OnSaved" OnRemoved="OnRemoved" OnCancel="() => _editing = null" />
+}
+
+@code {
+    private const int PageSize = 24;
+
+    private ShelfFilter _filter = ShelfFilter.Empty;
+    private IReadOnlyList<StatusOption> _statusOptions = ShelfStatusOptions.Generic;
+    private bool _started;
+    private List<ShelfEntryResponse>? _entries;
+    private string? _nextCursor;
+    private int? _totalCount;
+    private bool _loadingMore;
+    private ApiProblem? _problem;
+    private string? _notice;
+    private ShelfEntryResponse? _editing;
+    private CancellationTokenSource? _loading;
+
+    [SupplyParameterFromQuery(Name = "type")]
+    public string? Type { get; set; }
+
+    [SupplyParameterFromQuery(Name = "status")]
+    public string[]? Status { get; set; }
+
+    [SupplyParameterFromQuery(Name = "favorite")]
+    public string? Favorite { get; set; }
+
+    [SupplyParameterFromQuery(Name = "year")]
+    public string? Year { get; set; }
+
+    [SupplyParameterFromQuery(Name = "sort")]
+    public string? Sort { get; set; }
+
+    private string SearchHref => _filter.Type is { } type ? $"search?type={CatalogMetadata.QueryValue(type)}" : "search";
+
+    // Runs on the first visit and whenever the URL's query changes (a filter click, reload, back/forward).
+    protected override async Task OnParametersSetAsync()
+    {
+        var requested = ShelfFilter.Parse(Type, Status, Favorite, Year, Sort);
+        var options = await ShelfStatusOptions.ForAsync(Catalog, requested.Type);
+        requested = requested.KeepOnly(options);
+        if (_started && requested.Equals(_filter))
+        {
+            return;
+        }
+
+        _started = true;
+        _filter = requested;
+        _statusOptions = options;
+        await LoadAsync(cursor: null);
+    }
+
+    private async Task ApplyAsync(ShelfFilter next)
+    {
+        var options = await ShelfStatusOptions.ForAsync(Catalog, next.Type);
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(next.KeepOnly(options).ToQuery()));
+    }
+
+    private Task ClearAsync() => ApplyAsync(ShelfFilter.Empty with { Sort = _filter.Sort });
+
+    private Task ReloadAsync() => LoadAsync(cursor: null);
+
+    private Task LoadMoreAsync() => LoadAsync(_nextCursor);
+
+    private async Task LoadAsync(string? cursor)
+    {
+        // A newer filter wins: cancel the request it replaces so a slow answer cannot overwrite the list.
+        if (_loading is not null)
+        {
+            await _loading.CancelAsync();
+            _loading.Dispose();
+        }
+
+        _loading = new CancellationTokenSource();
+        var token = _loading.Token;
+        var filter = _filter;
+        _problem = null;
+        _loadingMore = cursor is not null;
+        if (cursor is null)
+        {
+            _entries = null;
+            _nextCursor = null;
+            _totalCount = null;
+            _notice = null;
+        }
+
+        try
+        {
+            var page = await Api.Api.V1.Me.Shelf.GetAsync(c => filter.Apply(c.QueryParameters, cursor, PageSize), token);
+            var entries = _entries ?? [];
+            // Edits can move an entry between pages (e.g. a new rating); show it once.
+            var shown = entries.Select(e => e.Item?.Id).ToHashSet();
+            entries.AddRange((page?.Items ?? []).Where(e => shown.Add(e.Item?.Id)));
+            _entries = entries;
+            _nextCursor = page?.NextCursor;
+            _totalCount = page?.TotalCount ?? entries.Count;
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        {
+            _problem = ApiProblem.From(exception);
+        }
+
+        _loadingMore = false;
+    }
+
+    private void Edit(ShelfEntryResponse entry)
+    {
+        _notice = null;
+        _editing = entry;
+    }
+
+    private void OnSaved(ShelfEntryResponse? saved)
+    {
+        if (saved is not null && _editing is { } old && _entries is not null)
+        {
+            saved.Item ??= old.Item;
+            var index = _entries.IndexOf(old);
+            if (index >= 0)
+            {
+                _entries[index] = saved;
+            }
+
+            _notice = $"{saved.Item?.Title} güncellendi.";
+        }
+
+        _editing = null;
+    }
+
+    private void OnRemoved()
+    {
+        if (_editing is { } old && _entries is not null && _entries.Remove(old))
+        {
+            _totalCount = Math.Max(0, (_totalCount ?? 1) - 1);
+            _notice = $"{old.Item?.Title} raftan kaldırıldı.";
+        }
+
+        _editing = null;
+    }
+
+    public void Dispose()
+    {
+        _loading?.Cancel();
+        _loading?.Dispose();
+    }
+}

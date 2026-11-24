@@ -1,0 +1,58 @@
+@using System.Globalization
+@using Microsoft.Kiota.Abstractions
+@inject CatalogMetadata Catalog
+
+<ItemCard Href="@($"items/{Entry.Item?.Id}")" Title="@Title" Type="Entry.Item?.Type" Year="Entry.Item?.Year" Subtitle="@Creators" CoverUrl="@Entry.Item?.CoverUrl">
+    <StatusBadge Type="Entry.Item?.Type" Status="Entry.Status" />
+    @if (Entry.IsFavorite == true)
+    {
+        <span class="shelf-card__favorite" title="Favori"><span aria-hidden="true">♥</span><span class="visually-hidden">Favori</span></span>
+    }
+    @if (Entry.Rating is { } rating)
+    {
+        <span class="shelf-card__rating"><span class="visually-hidden">Puan: </span><span aria-hidden="true">★ </span>@rating</span>
+    }
+    @if (_progress is not null)
+    {
+        <span class="shelf-card__progress"><span class="visually-hidden">İlerleme: </span>@_progress.Text</span>
+        @if (_progress.Percent is { } percent && Entry.Status == ShelfStatus.InProgress)
+        {
+            <div class="progress shelf-card__bar" aria-hidden="true">
+                <div class="progress__bar" style="width: @(percent.ToString(CultureInfo.InvariantCulture))%"></div>
+            </div>
+        }
+    }
+    <button type="button" class="button button--ghost button--small shelf-card__edit" @onclick="OnEdit">Düzenle<span class="visually-hidden">: @Title</span></button>
+</ItemCard>
+
+@code {
+    private ShelfProgress? _progress;
+
+    [Parameter, EditorRequired]
+    public ShelfEntryResponse Entry { get; set; } = new();
+
+    [Parameter]
+    public EventCallback OnEdit { get; set; }
+
+    private string Title => Entry.Item?.Title ?? string.Empty;
+
+    private string? Creators => Entry.Item?.Creators is { Count: > 0 } creators ? string.Join(", ", creators.Take(2)) : null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        ProgressUnit? unit = null;
+        if (Entry.Progress is not null)
+        {
+            try
+            {
+                unit = (await Catalog.ForAsync(Entry.Item?.Type))?.ProgressUnit;
+            }
+            catch (Exception exception) when (exception is ApiException or HttpRequestException)
+            {
+                // Without the catalog the bare number is still useful.
+            }
+        }
+
+        _progress = ShelfProgress.Describe(Entry.Progress, Entry.Item?.ProgressTotal, unit);
+    }
+}

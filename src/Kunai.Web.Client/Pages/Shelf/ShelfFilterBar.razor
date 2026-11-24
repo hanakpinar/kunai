@@ -1,0 +1,90 @@
+@using System.Globalization
+
+<div class="shelf-filters">
+    <div class="tabs" role="group" aria-label="Tür">
+        <button type="button" class="@(Filter.Type is null ? "active" : null)" aria-pressed="@Pressed(Filter.Type is null)"
+                @onclick="() => ChangeAsync(Filter with { Type = null })">Tümü</button>
+        @foreach (var type in ShelfFilter.Types)
+        {
+            <button type="button" class="@(Filter.Type == type ? "active" : null)" aria-pressed="@Pressed(Filter.Type == type)"
+                    @onclick="() => ChangeAsync(Filter with { Type = type })">@CatalogMetadata.TypeName(type)</button>
+        }
+    </div>
+
+    <div class="toolbar">
+        <div class="chips" role="group" aria-label="Durum">
+            @foreach (var option in StatusOptions)
+            {
+                var selected = Filter.Statuses.Contains(option.Status);
+                <button type="button" class="chip @(selected ? "active" : null)" aria-pressed="@Pressed(selected)"
+                        @onclick="() => ChangeAsync(Filter.Toggle(option.Status))">@option.Label</button>
+            }
+        </div>
+        <button type="button" class="chip shelf-filters__favorite @(Filter.Favorite ? "active" : null)" aria-pressed="@Pressed(Filter.Favorite)"
+                @onclick="() => ChangeAsync(Filter with { Favorite = !Filter.Favorite })"><span aria-hidden="true">♥ </span>Favoriler</button>
+
+        <span class="spacer"></span>
+
+        <label class="shelf-filters__field">
+            <span>Bitiş yılı</span>
+            <select value="@(Filter.Year?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)" @onchange="YearChangedAsync">
+                <option value="">Tüm yıllar</option>
+                @foreach (var year in Years)
+                {
+                    <option value="@year.ToString(CultureInfo.InvariantCulture)">@year.ToString(CultureInfo.InvariantCulture)</option>
+                }
+            </select>
+        </label>
+        <label class="shelf-filters__field">
+            <span>Sırala</span>
+            <select value="@Filter.Sort" @onchange="SortChangedAsync">
+                @foreach (var option in ShelfFilter.SortOptions)
+                {
+                    <option value="@option.Value">@option.Label</option>
+                }
+            </select>
+        </label>
+        @if (Filter.IsFiltered)
+        {
+            <button type="button" class="button button--ghost button--small" @onclick="ClearAsync">Filtreleri temizle</button>
+        }
+    </div>
+</div>
+
+@code {
+    private const int YearsShown = 10;
+
+    [Parameter, EditorRequired]
+    public ShelfFilter Filter { get; set; } = ShelfFilter.Empty;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<StatusOption> StatusOptions { get; set; } = [];
+
+    /// <summary>Raised with the next filter; the page puts it in the URL.</summary>
+    [Parameter]
+    public EventCallback<ShelfFilter> OnChange { get; set; }
+
+    // The last ten years on the device's calendar, plus an older year that came in through the URL.
+    private IEnumerable<int> Years
+    {
+        get
+        {
+            var thisYear = DateTime.Now.Year;
+            var years = Enumerable.Range(thisYear - YearsShown + 1, YearsShown).Reverse();
+            return Filter.Year is { } chosen && !years.Contains(chosen) ? years.Append(chosen) : years;
+        }
+    }
+
+    private Task ChangeAsync(ShelfFilter next) => OnChange.InvokeAsync(next);
+
+    private Task YearChangedAsync(ChangeEventArgs args) => ChangeAsync(Filter with
+    {
+        Year = int.TryParse(args.Value?.ToString(), NumberStyles.None, CultureInfo.InvariantCulture, out var year) ? year : null,
+    });
+
+    private Task SortChangedAsync(ChangeEventArgs args) => ChangeAsync(Filter with { Sort = ShelfFilter.ParseSort(args.Value?.ToString()) });
+
+    private Task ClearAsync() => ChangeAsync(ShelfFilter.Empty with { Sort = Filter.Sort });
+
+    private static string Pressed(bool value) => value ? "true" : "false";
+}
