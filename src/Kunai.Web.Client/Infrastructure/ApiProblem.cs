@@ -11,8 +11,11 @@ namespace Kunai.Web.Client.Infrastructure;
 /// </summary>
 public sealed record ApiProblem(string Code, string Message, IReadOnlyDictionary<string, string> Fields, int Status, string? Detail = null)
 {
-    /// <summary>Whether trying the same request again can succeed (network, rate limit, server or provider outage).</summary>
-    public bool IsRetryable => Status is 0 or 429 or >= 500;
+    /// <summary>
+    /// Whether trying the same request again can succeed (network, rate limit, server or provider outage).
+    /// A provider without credentials answers 503 too, but stays unavailable until the server is configured.
+    /// </summary>
+    public bool IsRetryable => Status is 0 or 429 or >= 500 && !string.Equals(Code, "provider_not_configured", StringComparison.Ordinal);
 
     public static ApiProblem From(Exception exception)
     {
