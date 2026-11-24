@@ -1,9 +1,16 @@
+@using Kunai.Web.Client.Pages.Search.Items
 @using Microsoft.Kiota.Abstractions
 @inject KunaiApiClient Api
+@inject AuthSession Session
 
 @if (!SignedIn)
 {
     <a class="button button--small button--ghost" href="@SearchQuery.LoginUrl(ReturnPath)">Rafa ekle<span class="visually-hidden">: @Hit.Title</span></a>
+    @if (Hit.Id is null)
+    {
+        @* Not in the catalog yet: opening it imports it, which needs an account, so the card leads to sign-in. *@
+        <small class="hit-hint">Ayrıntılar için giriş yap</small>
+    }
 }
 else if (_entry is not null)
 {
@@ -76,13 +83,22 @@ else
             {
                 // It may be on the shelf already (added elsewhere): edit that entry rather than overwrite it.
                 _entry = await ShelfEntryAsync(itemId);
-                _progressTotal ??= _entry?.Item?.ProgressTotal;
+                if (_entry is not null)
+                {
+                    _progressTotal ??= _entry.Item?.ProgressTotal;
+                }
+                else
+                {
+                    _progressTotal ??= await ProgressTotalAsync(itemId);
+                }
+
                 _editing = true;
             }
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
         {
             _problem = ApiProblem.From(exception);
+            await Session.RefreshIfExpiredAsync(_problem);
         }
         finally
         {
@@ -97,6 +113,25 @@ else
             return await Api.Api.V1.Me.Shelf[itemId].GetAsync();
         }
         catch (ApiException exception) when (exception.ResponseStatusCode == 404)
+        {
+            return null;
+        }
+    }
+
+    // A hit that was in the catalog already carries no total: read it from the item, so the editor can show
+    // "/ 412" and cap the progress. The editor still opens without it.
+    private async Task<int?> ProgressTotalAsync(Guid itemId)
+    {
+        if (!ItemFacts.HasProgressTotal(Hit.Type))
+        {
+            return null;
+        }
+
+        try
+        {
+            return (await Api.Api.V1.Items[itemId].GetAsync())?.ProgressTotal;
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
         {
             return null;
         }

@@ -1,3 +1,6 @@
 /* An import failure stays next to the card it belongs to, compact enough for a narrow column. */
 .hit-problem { width: 100%; font-size: 0.8rem; }
 .hit-problem ::deep .alert { padding: 0.5rem 0.65rem; }
+
+/* Tells a signed-out visitor why the card asks them to sign in. */
+.hit-hint { color: var(--muted); font-size: 0.75rem; }

@@ -6,6 +6,12 @@ namespace Kunai.Web.Client.Pages.Search;
 /// <summary>Reads and builds the /search?q=&amp;type= address, so links and the page agree on the format.</summary>
 public static class SearchQuery
 {
+    /// <summary>The shortest search text the API accepts.</summary>
+    public const int MinLength = 2;
+
+    /// <summary>The longest search text the API accepts; longer text answers 400 query_length.</summary>
+    public const int MaxLength = 100;
+
     /// <summary>The types a search can target, in the order the tabs show them.</summary>
     public static IReadOnlyList<ItemType> Types { get; } = Enum.GetValues<ItemType>();
 
@@ -22,9 +28,10 @@ public static class SearchQuery
 
     /// <summary>
     /// Where a hit's card leads: its page when it is in the catalog, otherwise a page that imports it first.
+    /// Importing needs an account, so a signed-out visitor goes to sign in first and comes back to it.
     /// Null for a hit with neither (the API always sends one of them).
     /// </summary>
-    public static string? ItemUrl(SearchItem hit)
+    public static string? ItemUrl(SearchItem hit, bool signedIn)
     {
         ArgumentNullException.ThrowIfNull(hit);
         if (hit.Id is { } id)
@@ -32,6 +39,22 @@ public static class SearchQuery
             return $"items/{id}";
         }
 
-        return string.IsNullOrEmpty(hit.Ref) ? null : $"items/open?ref={Uri.EscapeDataString(hit.Ref)}";
+        if (string.IsNullOrEmpty(hit.Ref))
+        {
+            return null;
+        }
+
+        var open = $"items/open?ref={Uri.EscapeDataString(hit.Ref)}";
+        return signedIn ? open : LoginUrl(open);
+    }
+
+    /// <summary>
+    /// What identifies a hit across pages: the provider ref, or the catalog id for a book added by hand.
+    /// Null when the hit has neither, so it is never mistaken for another one.
+    /// </summary>
+    public static string? HitKey(SearchItem hit)
+    {
+        ArgumentNullException.ThrowIfNull(hit);
+        return hit.Ref ?? hit.Id?.ToString();
     }
 }

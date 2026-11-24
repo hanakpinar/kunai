@@ -1,6 +1,7 @@
 @using Microsoft.Kiota.Abstractions
 @inject KunaiApiClient Api
 @inject CatalogMetadata Catalog
+@inject AuthSession Session
 
 <section class="shelf-panel" aria-labelledby="shelf-panel-title">
     <h2 id="shelf-panel-title" class="shelf-panel__title">Rafın</h2>
@@ -17,7 +18,10 @@
     else if (_problem is not null)
     {
         <ProblemAlert Problem="_problem" />
-        <button type="button" class="button button--ghost" @onclick="LoadAsync">Tekrar dene</button>
+        @if (_problem.IsRetryable)
+        {
+            <button type="button" class="button button--ghost" @onclick="LoadAsync">Tekrar dene</button>
+        }
     }
     else if (_entry is null)
     {
@@ -75,7 +79,15 @@
     protected override async Task OnParametersSetAsync()
     {
         _signedIn = AuthState is not null && (await AuthState).User.Identity?.IsAuthenticated == true;
-        if (!_signedIn || Item.Id == _loadedFor)
+        if (!_signedIn)
+        {
+            // Signed out (or the session expired): load the shelf again after the next sign-in.
+            _loadedFor = null;
+            _editing = false;
+            return;
+        }
+
+        if (Item.Id == _loadedFor)
         {
             return;
         }
@@ -99,9 +111,10 @@
             // Not on the shelf yet.
             _entry = null;
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
         {
             _problem = ApiProblem.From(exception);
+            await Session.RefreshIfExpiredAsync(_problem);
         }
         finally
         {
@@ -116,7 +129,7 @@
         {
             return (await Catalog.ForAsync(Item.Type))?.ProgressUnit;
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
         {
             return null;
         }

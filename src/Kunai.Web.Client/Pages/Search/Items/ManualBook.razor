@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @using Microsoft.Kiota.Abstractions
 @inject KunaiApiClient Api
+@inject AuthSession Session
 @inject NavigationManager Navigation
 
 <PageTitle>Kitabı elle ekle · Kunai</PageTitle>
@@ -97,13 +98,16 @@
             var item = await Api.Api.V1.Items.PostAsync(_form.ToRequest());
             Navigation.NavigateTo($"items/{item?.Id}?added=true");
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
         {
             _problem = ApiProblem.From(exception);
-            if (exception is ProblemDetails { Code: "book_exists" } conflict)
+            if (string.Equals(_problem.Code, "book_exists", StringComparison.Ordinal))
             {
-                _existingId = ManualBookForm.ExistingBookId(conflict.Detail);
+                _existingId = ManualBookForm.ExistingBookId(_problem.Detail);
             }
+
+            // An expired session sends the page to sign in instead of failing every try.
+            await Session.RefreshIfExpiredAsync(_problem);
         }
         finally
         {

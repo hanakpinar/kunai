@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @using Microsoft.Kiota.Abstractions
 @inject KunaiApiClient Api
+@inject AuthSession Session
 @inject NavigationManager Navigation
 
 @* A search hit that is not in the catalog yet links here: import it, then show its page. *@
@@ -25,7 +26,10 @@ else
         <h1>İçerik açılamadı</h1>
         <ProblemAlert Problem="_problem" />
         <p class="open-item__actions">
-            <button type="button" class="button" disabled="@_busy" @onclick="OpenAsync">Tekrar dene</button>
+            @if (_problem.IsRetryable)
+            {
+                <button type="button" class="button" disabled="@_busy" @onclick="OpenAsync">Tekrar dene</button>
+            }
             <a class="button button--ghost" href="search">Aramaya dön</a>
         </p>
     </section>
@@ -33,26 +37,45 @@ else
 
 @code {
     private ApiProblem? _problem;
+    private string? _openedRef;
     private bool _busy;
 
     [SupplyParameterFromQuery(Name = "ref")]
     public string? Ref { get; set; }
 
-    protected override Task OnParametersSetAsync() => string.IsNullOrWhiteSpace(Ref) ? Task.CompletedTask : OpenAsync();
+    protected override Task OnParametersSetAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Ref) || string.Equals(Ref, _openedRef, StringComparison.Ordinal))
+        {
+            return Task.CompletedTask;
+        }
+
+        _openedRef = Ref;
+        return OpenAsync();
+    }
 
     private async Task OpenAsync()
     {
+        var reference = Ref;
         _busy = true;
         _problem = null;
         try
         {
             // Safe to repeat: 201 for a new item, 200 when someone imported it already.
-            var item = await Api.Api.V1.Items.Import.PostAsync(new ImportItemRequest { Ref = Ref });
-            Navigation.NavigateTo($"items/{item?.Id}", replace: true);
+            var item = await Api.Api.V1.Items.Import.PostAsync(new ImportItemRequest { Ref = reference });
+            if (string.Equals(reference, Ref, StringComparison.Ordinal))
+            {
+                Navigation.NavigateTo($"items/{item?.Id}", replace: true);
+            }
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
         {
-            _problem = ApiProblem.From(exception);
+            // Another ref replaced this one while it was importing: only its own failure matters.
+            if (string.Equals(reference, Ref, StringComparison.Ordinal))
+            {
+                _problem = ApiProblem.From(exception);
+                await Session.RefreshIfExpiredAsync(_problem);
+            }
         }
         finally
         {

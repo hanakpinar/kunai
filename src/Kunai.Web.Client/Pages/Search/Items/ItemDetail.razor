@@ -1,7 +1,9 @@
 @page "/items/{Id:guid}"
+@implements IDisposable
 @using Microsoft.Kiota.Abstractions
 @inject KunaiApiClient Api
 @inject CatalogMetadata Catalog
+@inject NavigationManager Navigation
 
 <PageTitle>@(_item?.Title ?? "İçerik") · Kunai</PageTitle>
 
@@ -16,9 +18,12 @@ else if (_problem is not null)
 {
     <h1 class="visually-hidden">İçerik yüklenemedi</h1>
     <ProblemAlert Problem="_problem" />
-    <p class="item-retry">
-        <button type="button" class="button button--ghost" disabled="@_loading" @onclick="LoadAsync">Tekrar dene</button>
-    </p>
+    @if (_problem.IsRetryable)
+    {
+        <p class="item-retry">
+            <button type="button" class="button button--ghost" disabled="@_loading" @onclick="LoadAsync">Tekrar dene</button>
+        </p>
+    }
 }
 else if (_item is null)
 {
@@ -50,8 +55,8 @@ else
 
             @if (_item.CatalogStatus == CatalogStatus.PendingReview)
             {
-                <p class="alert @(Added ? "alert--success" : "alert--info")" role="status">
-                    @(Added ? "Kitabı ekledin! " : null)Bu kitap moderatör onayı bekliyor. Onaylanana kadar yalnızca sen görebilir ve rafına ekleyebilirsin.
+                <p class="alert @(_justAdded ? "alert--success" : "alert--info")" role="status">
+                    @(_justAdded ? "Kitabı ekledin! " : null)Bu kitap moderatör onayı bekliyor. Onaylanana kadar yalnızca sen görebilir ve rafına ekleyebilirsin.
                 </p>
             }
             else if (_item.CatalogStatus == CatalogStatus.Rejected)
@@ -111,6 +116,7 @@ else
 }
 
 @code {
+    private CancellationTokenSource _cancel = new();
     private ItemResponse? _item;
     private IReadOnlyList<ItemFact> _facts = [];
     private SourceAttribution? _attribution;
@@ -118,6 +124,7 @@ else
     private Guid? _loadedFor;
     private bool _notFound;
     private bool _loading;
+    private bool _justAdded;
 
     [Parameter]
     public Guid Id { get; set; }
@@ -133,36 +140,69 @@ else
             return;
         }
 
+        // The same page instance shows another item (back/forward between two items): stop loading the old one,
+        // so its answer cannot replace the new one when it arrives last.
         _loadedFor = Id;
+        _justAdded = Added;
         _item = null;
+        _facts = [];
+        _attribution = null;
+        await _cancel.CancelAsync();
+        _cancel.Dispose();
+        _cancel = new CancellationTokenSource();
         await LoadAsync();
     }
 
     private async Task LoadAsync()
     {
+        var token = _cancel.Token;
+        var id = Id;
         _loading = true;
         _problem = null;
         _notFound = false;
         try
         {
-            var item = await Api.Api.V1.Items[Id].GetAsync();
-            _attribution = await AttributionAsync(item?.Source);
+            var item = await Api.Api.V1.Items[id].GetAsync(cancellationToken: token);
+            var attribution = await AttributionAsync(item?.Source);
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _attribution = attribution;
             _facts = item is null ? [] : ItemFacts.For(item);
             _item = item;
             _notFound = item is null;
+            if (Added)
+            {
+                // Greet once: drop ?added=true from the history entry, so a reload or coming back does not repeat it.
+                Navigation.NavigateTo($"items/{id}", replace: true);
+            }
         }
-        catch (ApiException exception) when (exception.ResponseStatusCode == 404)
+        catch (Exception exception) when (exception is ApiException or HttpRequestException or OperationCanceledException)
         {
-            // Unknown id, or someone else's book that is still waiting for review.
-            _notFound = true;
-        }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
-        {
-            _problem = ApiProblem.From(exception);
+            // A cancelled token means another item replaced this one: its answer, or failure, no longer matters.
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (exception is ApiException { ResponseStatusCode: 404 })
+            {
+                // Unknown id, or someone else's book that is still waiting for review.
+                _notFound = true;
+            }
+            else
+            {
+                _problem = ApiProblem.From(exception);
+            }
         }
         finally
         {
-            _loading = false;
+            if (!token.IsCancellationRequested)
+            {
+                _loading = false;
+            }
         }
     }
 
@@ -174,9 +214,15 @@ else
         {
             return (await Catalog.GetAsync())?.Sources?.FirstOrDefault(s => s.Source == source);
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
         {
             return null;
         }
+    }
+
+    public void Dispose()
+    {
+        _cancel.Cancel();
+        _cancel.Dispose();
     }
 }

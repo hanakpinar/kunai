@@ -9,9 +9,10 @@
 <section class="search">
     <header class="search__header">
         <h1>@(_query.Length > 0 ? $"“{_query}” için sonuçlar" : "Yeni bir hedef bul")</h1>
-        <form class="search__form" role="search" @onsubmit="Submit">
+        @* Named, so screen readers can tell it from the top bar's search. *@
+        <form class="search__form" role="search" aria-label="Aramayı düzenle" @onsubmit="Submit">
             <label class="visually-hidden" for="search-text">Aranacak kelime</label>
-            <input id="search-text" type="search" @bind="_text" placeholder="Başlık, yazar, yönetmen…" minlength="2" maxlength="100" />
+            <input id="search-text" type="search" @bind="_text" placeholder="Başlık, yazar, yönetmen…" minlength="@SearchQuery.MinLength" maxlength="@SearchQuery.MaxLength" />
             <button type="submit" class="button">Ara</button>
         </form>
     </header>
@@ -23,62 +24,73 @@
         }
     </nav>
 
-    @if (_query.Length < 2)
+    @switch (State)
     {
-        <EmptyState Message="@(_query.Length == 0 ? "Ne okuyorsun, ne izliyorsun, ne oynuyorsun? Hedefini yaz, gerisini Kunai bulsun." : "Aramak için en az 2 karakter yaz.")" />
-    }
-    else if (_hits.Count == 0 && _loading)
-    {
-        <Spinner Label="Aranıyor…" />
-    }
-    else if (_hits.Count == 0 && _problem is not null)
-    {
-        <ProblemAlert Problem="_problem" />
-        <p class="search__retry">
-            <button type="button" class="button button--ghost" disabled="@_loading" @onclick="RetryAsync">Tekrar dene</button>
-        </p>
-    }
-    else if (_hits.Count == 0)
-    {
-        <EmptyState Message="@($"“{_query}” için bir şey bulamadık. Başka bir kelime ya da tür dene.")">
-            @if (_type == ItemType.Book)
-            {
-                <a class="button" href="items/new">Kitabı elle ekle</a>
-            }
-        </EmptyState>
-    }
-    else
-    {
-        <div class="card-grid">
-            @foreach (var hit in _hits)
-            {
-                <ItemCard @key="hit" Href="@SearchQuery.ItemUrl(hit)" Title="@(hit.Title ?? string.Empty)" Type="hit.Type" Year="hit.Year" Subtitle="@hit.Subtitle" CoverUrl="@hit.CoverUrl">
-                    <SearchHitActions Hit="hit" SignedIn="_signedIn" ReturnPath="@SearchQuery.Url(_query, _type)" OnImported="StateHasChanged" />
-                </ItemCard>
-            }
-        </div>
+        case View.Prompt:
+            <EmptyState Message="@(_query.Length == 0 ? "Ne okuyorsun, ne izliyorsun, ne oynuyorsun? Hedefini yaz, gerisini Kunai bulsun." : "Aramak için en az 2 karakter yaz.")" />
+            break;
 
-        <footer class="search__more">
+        case View.TooLong:
+            <EmptyState Message="Arama en fazla 100 karakter olabilir. Daha kısa bir başlık ya da isim dene." />
+            break;
+
+        case View.Loading:
+            <Spinner Label="Aranıyor…" />
+            break;
+
+        case View.Failed:
             <ProblemAlert Problem="_problem" />
-            @if (_problem is not null)
+            @if (_problem is { IsRetryable: true })
             {
-                <button type="button" class="button button--ghost" disabled="@_loading" @onclick="RetryAsync">Tekrar dene</button>
+                <p class="search__retry">
+                    <button type="button" class="button button--ghost" disabled="@_loading" @onclick="RetryAsync">Tekrar dene</button>
+                </p>
             }
-            else if (_nextCursor is not null)
-            {
-                <button type="button" class="button button--ghost" disabled="@_loading" @onclick="LoadMoreAsync">@(_loading ? "Yükleniyor…" : "Daha fazla")</button>
-            }
-        </footer>
+            break;
+
+        case View.NoResults:
+            <EmptyState Message="@($"“{_query}” için bir şey bulamadık. Başka bir kelime ya da tür dene.")">
+                @if (_type == ItemType.Book)
+                {
+                    <a class="button" href="items/new">Kitabı elle ekle</a>
+                }
+            </EmptyState>
+            break;
+
+        case View.Results:
+            <div class="card-grid">
+                @foreach (var hit in _hits)
+                {
+                    <ItemCard @key="hit" Href="@SearchQuery.ItemUrl(hit, _signedIn)" Title="@(hit.Title ?? string.Empty)" Type="hit.Type" Year="hit.Year" Subtitle="@hit.Subtitle" CoverUrl="@hit.CoverUrl">
+                        <SearchHitActions Hit="hit" SignedIn="_signedIn" ReturnPath="@SearchQuery.Url(_query, _type)" OnImported="StateHasChanged" />
+                    </ItemCard>
+                }
+            </div>
+
+            <footer class="search__more">
+                <ProblemAlert Problem="_problem" />
+                @if (_problem is { IsRetryable: true })
+                {
+                    <button type="button" class="button button--ghost" disabled="@_loading" @onclick="RetryAsync">Tekrar dene</button>
+                }
+                else if (_problem is null && _nextCursor is not null)
+                {
+                    <button type="button" class="button button--ghost" disabled="@_loading" @onclick="LoadMoreAsync">@(_loading ? "Yükleniyor…" : "Daha fazla")</button>
+                }
+            </footer>
+            break;
     }
 
-    @if (_type == ItemType.Book && _hits.Count > 0)
+    @* A book that no provider knows can always be added by hand. The no-results message offers it already. *@
+    @if (_type == ItemType.Book && State is not (View.Loading or View.NoResults))
     {
-        <p class="search__manual">Aradığını bulamadın mı? <a href="items/new">Elle ekle</a></p>
+        <p class="search__manual">Kitabı bulamıyor musun? <a href="items/new">Elle ekle</a></p>
     }
 </section>
 
 @code {
     private readonly List<SearchItem> _hits = [];
+    private readonly HashSet<string> _seen = new(StringComparer.Ordinal);
     private CancellationTokenSource _cancel = new();
     private string _query = string.Empty;
     private string _text = string.Empty;
@@ -90,6 +102,16 @@
     private bool _loading;
     private bool _signedIn;
 
+    private enum View
+    {
+        Prompt,
+        TooLong,
+        Loading,
+        Failed,
+        NoResults,
+        Results,
+    }
+
     [SupplyParameterFromQuery(Name = "q")]
     public string? Q { get; set; }
 
@@ -98,6 +120,16 @@
 
     [CascadingParameter]
     private Task<AuthenticationState>? AuthState { get; set; }
+
+    private View State => (_query.Length, _hits.Count) switch
+    {
+        (< SearchQuery.MinLength, _) => View.Prompt,
+        (> SearchQuery.MaxLength, _) => View.TooLong,
+        (_, > 0) => View.Results,
+        _ when _loading => View.Loading,
+        _ when _problem is not null => View.Failed,
+        _ => View.NoResults,
+    };
 
     protected override async Task OnParametersSetAsync()
     {
@@ -117,14 +149,17 @@
         _text = query;
         _type = type;
         _hits.Clear();
+        _seen.Clear();
         _nextCursor = null;
+        _failedCursor = null;
         _problem = null;
         await _cancel.CancelAsync();
         _cancel.Dispose();
         _cancel = new CancellationTokenSource();
         _loading = false;
 
-        if (query.Length >= 2)
+        // The API answers 400 query_length outside 2-100 characters: say so here instead of sending it.
+        if (query.Length is >= SearchQuery.MinLength and <= SearchQuery.MaxLength)
         {
             await LoadAsync(cursor: null);
         }
@@ -132,7 +167,7 @@
 
     private void Submit()
     {
-        if (_text.Trim().Length >= 2)
+        if (_text.Trim().Length >= SearchQuery.MinLength)
         {
             Navigation.NavigateTo(SearchQuery.Url(_text.Trim(), _type));
         }
@@ -162,7 +197,16 @@
                 return;
             }
 
-            _hits.AddRange(page?.Items ?? []);
+            // Each provider page is fetched and cached on its own, so a hit can come back on a later page:
+            // show it once. A hit without a ref or id cannot be told apart, so it is always kept.
+            foreach (var hit in page?.Items ?? [])
+            {
+                if (SearchQuery.HitKey(hit) is not { } hitKey || _seen.Add(hitKey))
+                {
+                    _hits.Add(hit);
+                }
+            }
+
             _nextCursor = page?.NextCursor;
         }
         catch (Exception exception) when (exception is ApiException or HttpRequestException or OperationCanceledException)

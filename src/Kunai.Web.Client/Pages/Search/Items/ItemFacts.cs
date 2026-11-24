@@ -43,7 +43,7 @@ public static class ItemFacts
             facts.Add(new("Platformlar", string.Join(", ", platforms)));
         }
 
-        Add(facts, "Format", details.Format);
+        Add(facts, "Format", FormatName(details.Format));
         Add(facts, "Yayınevi", details.Publisher);
         Add(facts, "ISBN-13", details.Isbn13);
         return facts;
@@ -55,6 +55,25 @@ public static class ItemFacts
         (0, var m) => $"{Number(m)} dk",
         (var h, 0) => $"{Number(h)} sa",
         (var h, var m) => $"{Number(h)} sa {Number(m)} dk",
+    };
+
+    /// <summary>Whether items of this type count progress against a total (pages, episodes, chapters).</summary>
+    public static bool HasProgressTotal(ItemType? type) => TotalLabel(type) is not null;
+
+    /// <summary>AniList's media format in Turkish ("TV_SHORT" → "Kısa dizi"); an unknown value is shown as sent.</summary>
+    public static string? FormatName(string? format) => format switch
+    {
+        "TV" => "TV dizisi",
+        "TV_SHORT" => "Kısa dizi",
+        "MOVIE" => "Film",
+        "SPECIAL" => "Özel bölüm",
+        "OVA" => "OVA (video)",
+        "ONA" => "ONA (internet)",
+        "MUSIC" => "Müzik videosu",
+        "MANGA" => "Manga",
+        "NOVEL" => "Light novel",
+        "ONE_SHOT" => "Tek bölümlük",
+        _ => format,
     };
 
     private static string? TotalLabel(ItemType? type) => type switch
