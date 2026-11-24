@@ -12,13 +12,15 @@
 
     <EditForm Model="_form" OnValidSubmit="SubmitAsync" class="form">
         <DataAnnotationsValidator />
-        <label class="field">
-            <span>Yeni kullanıcı adı</span>
-            <InputText @bind-Value="_form.Username" @bind-Value:after="Normalize" autocomplete="username" spellcheck="false" />
-            <small class="muted">3-24 karakter: küçük harf, rakam ve alt çizgi; harfle başlar.</small>
+        @* An explicit label: the hint describes the input instead of becoming part of its name. *@
+        <div class="field">
+            <label for="settings-new-username" class="field-label">Yeni kullanıcı adı</label>
+            <InputText id="settings-new-username" @bind-Value="_form.Username" @bind-Value:after="Normalize" autocomplete="username"
+                       spellcheck="false" aria-describedby="settings-new-username-hint" />
+            <small id="settings-new-username-hint" class="muted">3-24 karakter: küçük harf, rakam ve alt çizgi; harfle başlar.</small>
             <ValidationMessage For="() => _form.Username" />
             <FieldError Problem="Problem" Field="username" />
-        </label>
+        </div>
 
         <SectionFeedback Problem="AlertProblem(UsernameField)" Success="@Success" />
 

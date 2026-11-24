@@ -38,16 +38,17 @@
             return;
         }
 
-        // The API has already ended the session; forget it here too and leave the signed-in area.
+        // Leave the signed-in area first: signed out on /settings, the router would send the user to the sign-in page.
+        // Home needs no session, so forgetting it there only changes the header.
+        Navigation.NavigateTo(string.Empty, replace: true);
         try
         {
+            // The API has already ended the session; this clears the cookie and the local state too.
             await Session.LogoutAsync();
         }
-        catch (HttpRequestException)
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
         {
             // Offline right after the deletion: the next GET /me finds no session anyway.
         }
-
-        Navigation.NavigateTo(string.Empty, replace: true);
     }
 }

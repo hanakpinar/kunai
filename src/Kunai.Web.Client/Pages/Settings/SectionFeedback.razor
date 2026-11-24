@@ -1,8 +1,7 @@
 <ProblemAlert Problem="Problem" />
-@if (!string.IsNullOrEmpty(Success))
-{
-    <p class="alert alert--success" role="status">@Success</p>
-}
+@* The status region is always on the page (hidden while empty, so it takes no room in the form), because screen
+   readers announce a change inside a live region but often skip one that arrives together with its text. *@
+<p role="status" class="@(string.IsNullOrEmpty(Success) ? "visually-hidden" : "alert alert--success")">@Success</p>
 
 @code {
     [Parameter]

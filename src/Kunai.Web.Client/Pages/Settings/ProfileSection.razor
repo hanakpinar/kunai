@@ -45,12 +45,31 @@
         _form.Bio = Me.Bio;
     }
 
-    private Task SubmitAsync() =>
-        SaveAsync(
+    private async Task SubmitAsync()
+    {
+        var displayName = _form.DisplayName;
+        var bio = _form.Bio;
+        var saved = await SaveAsync(
             () => Api.Api.V1.Me.Profile.PutAsync(new ProfileRequest
             {
-                DisplayName = _form.DisplayName.Trim(),
-                Bio = string.IsNullOrWhiteSpace(_form.Bio) ? null : _form.Bio.Trim(),
+                DisplayName = displayName.Trim(),
+                Bio = string.IsNullOrWhiteSpace(bio) ? null : bio.Trim(),
             }),
             "Profilin kaydedildi.");
+
+        // Show what the API stored (trimmed), so the inputs and the counter match the profile; a field edited while
+        // the request was on its way keeps the newer text.
+        if (saved is not null)
+        {
+            if (string.Equals(_form.DisplayName, displayName, StringComparison.Ordinal))
+            {
+                _form.DisplayName = saved.DisplayName ?? string.Empty;
+            }
+
+            if (string.Equals(_form.Bio, bio, StringComparison.Ordinal))
+            {
+                _form.Bio = saved.Bio;
+            }
+        }
+    }
 }

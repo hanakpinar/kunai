@@ -1,3 +1,5 @@
+using System.Net;
+
 using Kunai.Web.Client.Api;
 using Kunai.Web.Client.Api.Models;
 using Kunai.Web.Client.Infrastructure;
@@ -9,7 +11,8 @@ namespace Kunai.Web.Client.Pages.Settings;
 
 /// <summary>
 /// One card on the settings page: its own request, busy flag, error and success message. After a
-/// successful change the session is reloaded, so the header (name, profile link) follows.
+/// successful change the session is reloaded, so the header (name, profile link) follows. When the
+/// API says the session has ended, the session is reloaded too, so the router sends the user to sign in.
 /// </summary>
 public abstract class SettingsSection : ComponentBase
 {
@@ -34,16 +37,23 @@ public abstract class SettingsSection : ComponentBase
     protected string? Success { get; private set; }
 
     /// <summary>Saves a change the API answers with the updated account.</summary>
-    protected Task<bool> SaveAsync(Func<Task<MeResponse?>> request, string success) =>
-        SaveAsync(
+    /// <returns>The account as the API stored it, or null when the save failed.</returns>
+    protected async Task<MeResponse?> SaveAsync(Func<Task<MeResponse?>> request, string success)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        MeResponse? saved = null;
+        await SaveAsync(
             async () =>
             {
-                if (await request() is { } me)
+                saved = await request();
+                if (saved is not null)
                 {
-                    await MeChanged.InvokeAsync(me);
+                    await MeChanged.InvokeAsync(saved);
                 }
             },
             success);
+        return saved;
+    }
 
     /// <summary>Sends the change; on success shows <paramref name="success"/> and reloads the session.</summary>
     protected async Task<bool> SaveAsync(Func<Task> request, string success)
@@ -54,15 +64,7 @@ public abstract class SettingsSection : ComponentBase
         }
 
         Success = success;
-        try
-        {
-            await Session.RefreshAsync();
-        }
-        catch (HttpRequestException)
-        {
-            // The change is saved; the header catches up on the next page load.
-        }
-
+        await RefreshSessionAsync();
         return true;
     }
 
@@ -73,20 +75,33 @@ public abstract class SettingsSection : ComponentBase
         Busy = true;
         Problem = null;
         Success = null;
+        ApiProblem? problem = null;
         try
         {
             await request();
-            return true;
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
         {
-            Problem = ApiProblem.From(exception);
-            return false;
+            problem = ApiProblem.From(exception);
         }
         finally
         {
             Busy = false;
         }
+
+        if (problem is null)
+        {
+            return true;
+        }
+
+        Problem = problem;
+        if (problem.Status == (int)HttpStatusCode.Unauthorized)
+        {
+            // The session ended (signed out in another tab, expired): once the session knows, the router asks for a sign-in.
+            await RefreshSessionAsync();
+        }
+
+        return false;
     }
 
     /// <summary>The problem for the card's alert, unless every field message already shows next to its input.</summary>
@@ -94,4 +109,16 @@ public abstract class SettingsSection : ComponentBase
         Problem is { Fields.Count: > 0 } problem && problem.Fields.Keys.All(field => inlineFields.Contains(field, StringComparer.Ordinal))
             ? null
             : Problem;
+
+    private async Task RefreshSessionAsync()
+    {
+        try
+        {
+            await Session.RefreshAsync();
+        }
+        catch (TaskCanceledException)
+        {
+            // GET /me timed out (other network errors keep the current user): the header catches up on the next page load.
+        }
+    }
 }

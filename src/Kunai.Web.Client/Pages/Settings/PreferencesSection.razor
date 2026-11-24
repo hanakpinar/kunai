@@ -23,17 +23,18 @@
                 </InputSelect>
                 <FieldError Problem="Problem" Field="locale" />
             </label>
-            <label class="field">
-                <span>Saat dilimi</span>
-                <InputSelect @bind-Value="_form.TimeZone">
+            @* An explicit label: the hint describes the select instead of becoming part of its name. *@
+            <div class="field">
+                <label for="settings-tz" class="field-label">Saat dilimi</label>
+                <InputSelect id="settings-tz" @bind-Value="_form.TimeZone" aria-describedby="settings-tz-hint">
                     @foreach (var (id, name) in _timeZones)
                     {
                         <option value="@id">@name</option>
                     }
                 </InputSelect>
-                <small class="muted">“Bu yıl” sayıların ve görevlerin bu saat dilimine göre hesaplanır.</small>
+                <small id="settings-tz-hint" class="muted">“Bu yıl” sayıların ve görevlerin bu saat dilimine göre hesaplanır.</small>
                 <FieldError Problem="Problem" Field="timeZone" />
-            </label>
+            </div>
         </div>
 
         <AvatarPicker @bind-Value="_form.AvatarId" />

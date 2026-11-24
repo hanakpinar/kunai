@@ -26,3 +26,10 @@
     align-items: center;
     gap: 0.75rem;
 }
+
+/* A label tied to its control with for/id instead of wrapping it, so hints and counters stay out of the
+   control's accessible name; it looks like the wrapping labels' .field > span. */
+.settings ::deep .field-label {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
