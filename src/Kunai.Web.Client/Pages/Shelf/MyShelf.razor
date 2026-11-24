@@ -3,6 +3,7 @@
 @implements IDisposable
 @using Microsoft.Kiota.Abstractions
 @inject KunaiApiClient Api
+@inject AuthSession Session
 @inject CatalogMetadata Catalog
 @inject NavigationManager Navigation
 
@@ -35,7 +36,10 @@
         else
         {
             <ProblemAlert Problem="_problem" />
-            <button type="button" class="button button--ghost shelf-retry" @onclick="ReloadAsync">Tekrar dene</button>
+            @if (_problem.IsRetryable)
+            {
+                <button type="button" class="button button--ghost shelf-retry" @onclick="ReloadAsync">Tekrar dene</button>
+            }
         }
     }
     else if (_entries.Count == 0)
@@ -63,7 +67,12 @@
         {
             <div class="shelf-more">
                 <ProblemAlert Problem="_problem" />
-                @if (_nextCursor is not null)
+                @if (_problem is { IsRetryable: false })
+                {
+                    @* The same cursor would fail again (e.g. the list changed): start over from the first page. *@
+                    <button type="button" class="button button--ghost" @onclick="ReloadAsync">Listeyi yenile</button>
+                }
+                else if (_nextCursor is not null)
                 {
                     <button type="button" class="button button--ghost" disabled="@_loadingMore" @onclick="LoadMoreAsync">@(_loadingMore ? "Yükleniyor…" : "Daha fazla")</button>
                 }
@@ -72,19 +81,23 @@
     }
 </section>
 
-@if (_editing is { Item: { } item })
+@if (_editing is { Item: { } item } editing)
 {
-    <ShelfEntryEditor @key="_editing" ItemId="item.Id ?? Guid.Empty" ItemType="item.Type" Title="@(item.Title ?? "Düzenle")"
-                      ProgressTotal="item.ProgressTotal" Existing="_editing"
-                      OnSaved="OnSaved" OnRemoved="OnRemoved" OnCancel="() => _editing = null" />
+    <ShelfEntryEditor @key="editing" ItemId="item.Id ?? Guid.Empty" ItemType="item.Type" Title="@(item.Title ?? "Düzenle")"
+                      ProgressTotal="item.ProgressTotal" Existing="editing"
+                      OnSaved="saved => OnSaved(editing, saved)" OnRemoved="() => OnRemovedAsync(editing)" OnCancel="() => Close(editing)" />
 }
 
 @code {
     private const int PageSize = 24;
 
+    // What the filter bar shows: the URL's filter, set as soon as the URL changes.
     private ShelfFilter _filter = ShelfFilter.Empty;
+
+    // The filter the list below was loaded with; null before the first load.
+    private ShelfFilter? _listFilter;
     private IReadOnlyList<StatusOption> _statusOptions = ShelfStatusOptions.Generic;
-    private bool _started;
+    private int _parametersVersion;
     private List<ShelfEntryResponse>? _entries;
     private string? _nextCursor;
     private int? _totalCount;
@@ -115,16 +128,31 @@
     protected override async Task OnParametersSetAsync()
     {
         var requested = ShelfFilter.Parse(Type, Status, Favorite, Year, Sort);
+        var version = ++_parametersVersion;
+
+        // Show the URL's filter while the type's statuses load (a full round trip on a cold start), so the bar
+        // does not flash "Tümü" and a click in that window builds on this filter, not on the previous one.
+        if (requested.Type != _filter.Type)
+        {
+            _statusOptions = ShelfStatusOptions.Generic;
+        }
+
+        _filter = requested;
         var options = await ShelfStatusOptions.ForAsync(Catalog, requested.Type);
-        requested = requested.KeepOnly(options);
-        if (_started && requested.Equals(_filter))
+        if (version != _parametersVersion)
+        {
+            return; // A newer URL arrived while the statuses loaded; that call takes over.
+        }
+
+        _filter = requested.KeepOnly(options);
+        _statusOptions = options;
+        if (_filter.Equals(_listFilter))
         {
             return;
         }
 
-        _started = true;
-        _filter = requested;
-        _statusOptions = options;
+        _listFilter = _filter;
+        _notice = null;
         await LoadAsync(cursor: null);
     }
 
@@ -142,16 +170,15 @@
 
     private async Task LoadAsync(string? cursor)
     {
-        // A newer filter wins: cancel the request it replaces so a slow answer cannot overwrite the list.
-        if (_loading is not null)
-        {
-            await _loading.CancelAsync();
-            _loading.Dispose();
-        }
-
+        // The newest load wins. Swap the token before anything awaits, so a load that starts in between cannot
+        // be left uncancelled, then cancel the load this one replaces.
+        var previous = _loading;
         _loading = new CancellationTokenSource();
         var token = _loading.Token;
-        var filter = _filter;
+        previous?.Cancel();
+        previous?.Dispose();
+
+        var filter = _listFilter ?? ShelfFilter.Empty;
         _problem = null;
         _loadingMore = cursor is not null;
         if (cursor is null)
@@ -159,13 +186,21 @@
             _entries = null;
             _nextCursor = null;
             _totalCount = null;
-            _notice = null;
+
+            // The editor belongs to a card of the list being replaced.
+            _editing = null;
         }
 
         try
         {
             var page = await Api.Api.V1.Me.Shelf.GetAsync(c => filter.Apply(c.QueryParameters, cursor, PageSize), token);
+            if (token.IsCancellationRequested)
+            {
+                return; // A newer load replaced this one while the answer was on its way.
+            }
+
             var entries = _entries ?? [];
+
             // Edits can move an entry between pages (e.g. a new rating); show it once.
             var shown = entries.Select(e => e.Item?.Id).ToHashSet();
             entries.AddRange((page?.Items ?? []).Where(e => shown.Add(e.Item?.Id)));
@@ -173,16 +208,35 @@
             _nextCursor = page?.NextCursor;
             _totalCount = page?.TotalCount ?? entries.Count;
         }
-        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        catch (Exception exception) when (exception is ApiException or HttpRequestException or OperationCanceledException)
         {
-            return;
-        }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
-        {
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            // Our token was not cancelled, so a cancellation here is HttpClient's timeout: a network error.
             _problem = ApiProblem.From(exception);
         }
 
         _loadingMore = false;
+        if (_problem is { Status: 401 })
+        {
+            await RefreshSessionAsync();
+        }
+    }
+
+    // The session expired: GET /me answers 401 too, so the router swaps this page for the login redirect.
+    private async Task RefreshSessionAsync()
+    {
+        try
+        {
+            await Session.RefreshAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            // GET /me timed out: the message stays and the next action asks again.
+        }
     }
 
     private void Edit(ShelfEntryResponse entry)
@@ -191,37 +245,60 @@
         _editing = entry;
     }
 
-    private void OnSaved(ShelfEntryResponse? saved)
+    // An editor that answers after the list moved on must not close the one opened since.
+    private void Close(ShelfEntryResponse entry)
     {
-        if (saved is not null && _editing is { } old && _entries is not null)
+        if (ReferenceEquals(_editing, entry))
         {
-            saved.Item ??= old.Item;
-            var index = _entries.IndexOf(old);
-            if (index >= 0)
-            {
-                _entries[index] = saved;
-            }
-
-            _notice = $"{saved.Item?.Title} güncellendi.";
+            _editing = null;
         }
-
-        _editing = null;
     }
 
-    private void OnRemoved()
+    private void OnSaved(ShelfEntryResponse old, ShelfEntryResponse? saved)
     {
-        if (_editing is { } old && _entries is not null && _entries.Remove(old))
+        Close(old);
+        if (saved is null)
         {
-            _totalCount = Math.Max(0, (_totalCount ?? 1) - 1);
-            _notice = $"{old.Item?.Title} raftan kaldırıldı.";
+            return;
         }
 
-        _editing = null;
+        saved.Item ??= old.Item;
+        var index = IndexOf(old);
+        if (index >= 0)
+        {
+            _entries![index] = saved;
+        }
+
+        _notice = $"{saved.Item?.Title} güncellendi.";
     }
+
+    private async Task OnRemovedAsync(ShelfEntryResponse old)
+    {
+        Close(old);
+        _notice = $"{old.Item?.Title} raftan kaldırıldı.";
+        var index = IndexOf(old);
+        if (index < 0)
+        {
+            return;
+        }
+
+        _entries!.RemoveAt(index);
+        _totalCount = Math.Max(0, (_totalCount ?? 1) - 1);
+        if (_entries.Count == 0 && _nextCursor is not null)
+        {
+            // Every loaded card is gone but more are on the server: load them instead of an empty shelf.
+            await LoadAsync(cursor: null);
+        }
+    }
+
+    // By item id, not by reference: a reload replaces the objects while an editor may still be answering.
+    private int IndexOf(ShelfEntryResponse entry) =>
+        entry.Item?.Id is { } id && _entries is not null ? _entries.FindIndex(e => e.Item?.Id == id) : -1;
 
     public void Dispose()
     {
         _loading?.Cancel();
         _loading?.Dispose();
+        _loading = null;
     }
 }

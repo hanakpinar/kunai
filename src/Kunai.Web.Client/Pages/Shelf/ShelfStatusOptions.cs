@@ -40,9 +40,9 @@ public static class ShelfStatusOptions
                 return options;
             }
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        catch (Exception exception) when (exception is ApiException or HttpRequestException or OperationCanceledException)
         {
-            // Without the catalog the neutral labels still let the user filter.
+            // Without the catalog (unreachable, failing or timed out) the neutral labels still let the user filter.
         }
 
         return Generic;

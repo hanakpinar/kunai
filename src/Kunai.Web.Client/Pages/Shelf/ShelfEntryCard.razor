@@ -47,9 +47,9 @@
             {
                 unit = (await Catalog.ForAsync(Entry.Item?.Type))?.ProgressUnit;
             }
-            catch (Exception exception) when (exception is ApiException or HttpRequestException)
+            catch (Exception exception) when (exception is ApiException or HttpRequestException or OperationCanceledException)
             {
-                // Without the catalog the bare number is still useful.
+                // Without the catalog (unreachable, failing or timed out) the bare number is still useful.
             }
         }
 
