@@ -1,0 +1,93 @@
+@page "/login"
+@using Microsoft.Kiota.Abstractions
+@inject AuthSession Session
+@inject KunaiApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Giriş yap · Kunai</PageTitle>
+
+<section class="auth-card">
+    <h1>Tekrar hoş geldin</h1>
+    <p class="muted">Rafına kaldığın yerden devam et.</p>
+
+    <EditForm Model="_form" OnValidSubmit="SubmitAsync" class="form">
+        <DataAnnotationsValidator />
+        <label class="field">
+            <span>Kullanıcı adı ya da e-posta</span>
+            <InputText @bind-Value="_form.Login" autocomplete="username" />
+            <ValidationMessage For="() => _form.Login" />
+        </label>
+        <label class="field">
+            <span>Şifre</span>
+            <InputText type="password" @bind-Value="_form.Password" autocomplete="current-password" />
+            <ValidationMessage For="() => _form.Password" />
+        </label>
+
+        <ProblemAlert Problem="_problem" />
+        @if (_problem?.Code == "email_not_confirmed")
+        {
+            <button type="button" class="button button--ghost" disabled="@_busy" @onclick="ResendAsync">Onay e-postasını tekrar gönder</button>
+        }
+        @if (_resent)
+        {
+            <p class="alert alert--info">Gönderdik. Gelen kutunu kontrol et.</p>
+        }
+
+        <button type="submit" class="button button--block" disabled="@_busy">Giriş yap</button>
+    </EditForm>
+
+    <p class="auth-card__links">
+        <a href="forgot-password">Şifremi unuttum</a>
+        <span>·</span>
+        <a href="register">Hesabın yok mu? Kayıt ol</a>
+    </p>
+</section>
+
+@code {
+    private readonly LoginForm _form = new();
+    private ApiProblem? _problem;
+    private bool _busy;
+    private bool _resent;
+
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    private async Task SubmitAsync()
+    {
+        _busy = true;
+        _problem = null;
+        try
+        {
+            await Session.LoginAsync(_form.Login.Trim(), _form.Password);
+            Navigation.NavigateTo(SafeReturnUrl());
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        {
+            _problem = ApiProblem.From(exception);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ResendAsync()
+    {
+        if (!_form.Login.Contains('@', StringComparison.Ordinal))
+        {
+            _problem = _problem! with { Message = "Onay e-postası için e-posta adresinle giriş yapmayı dene." };
+            return;
+        }
+
+        _busy = true;
+        await Api.Api.V1.Auth.ConfirmEmail.Resend.PostAsync(new ResendConfirmationRequest { Email = _form.Login.Trim() });
+        _resent = true;
+        _busy = false;
+    }
+
+    // Only local paths: an attacker's link must not send users to another site after sign-in.
+    private string SafeReturnUrl() =>
+        ReturnUrl is { Length: > 0 } url && !url.Contains("//", StringComparison.Ordinal) && !url.Contains(':', StringComparison.Ordinal)
+            ? url.TrimStart('/')
+            : string.Empty;
+}

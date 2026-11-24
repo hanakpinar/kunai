@@ -1,0 +1,76 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+@inject AuthSession Session
+
+<div class="app-shell">
+    <header class="topbar">
+        <a class="brand" href="">
+            <img src="favicon.svg" alt="" width="32" height="32" />
+            <span>Kunai</span>
+        </a>
+
+        <form class="topbar__search" role="search" @onsubmit="SearchAsync">
+            <select @bind="_type" aria-label="Tür">
+                <option value="book">Kitap</option>
+                <option value="movie">Film</option>
+                <option value="series">Dizi</option>
+                <option value="game">Oyun</option>
+                <option value="anime">Anime</option>
+                <option value="manga">Manga</option>
+            </select>
+            <input type="search" @bind="_query" placeholder="Ne okudun, ne izledin, ne oynadın?" aria-label="Ara" minlength="2" />
+        </form>
+
+        <nav class="topbar__nav">
+            <AuthorizeView>
+                <Authorized>
+                    <NavLink href="shelf">Rafım</NavLink>
+                    <NavLink href="@($"u/{context.User.Identity?.Name}")">Profilim</NavLink>
+                    <NavLink href="settings">Ayarlar</NavLink>
+                    <button type="button" class="button button--ghost button--small" @onclick="LogoutAsync">Çıkış</button>
+                </Authorized>
+                <NotAuthorized>
+                    <NavLink href="login">Giriş yap</NavLink>
+                    <a class="button button--small" href="register">Kayıt ol</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </nav>
+    </header>
+
+    <main class="page">
+        @Body
+    </main>
+
+    <footer class="footer">
+        <p>Kunai · Oku. İzle. Oyna. Hedefi vur.</p>
+        <p class="footer__attribution">
+            Film ve dizi verileri TMDB API'si ile sağlanır, TMDB tarafından onaylanmamıştır.
+            Kitaplar: Google Books ve Open Library · Oyunlar: IGDB.com · Anime ve manga: AniList.
+        </p>
+    </footer>
+</div>
+
+<div id="blazor-error-ui" role="alert">
+    Beklenmeyen bir hata oluştu.
+    <a href="." class="reload">Yenile</a>
+    <span class="dismiss">✕</span>
+</div>
+
+@code {
+    private string _query = string.Empty;
+    private string _type = "book";
+
+    private void SearchAsync()
+    {
+        if (_query.Trim().Length >= 2)
+        {
+            Navigation.NavigateTo($"search?q={Uri.EscapeDataString(_query.Trim())}&type={_type}");
+        }
+    }
+
+    private async Task LogoutAsync()
+    {
+        await Session.LogoutAsync();
+        Navigation.NavigateTo(string.Empty);
+    }
+}

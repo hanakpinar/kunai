@@ -1,0 +1,4354 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Kunai API",
+    "description": "Track the books, movies, series, games, anime and manga you read, watch and play. Errors are problem details with a stable \"code\"; see docs/errors.md.",
+    "version": "v1"
+  },
+  "paths": {
+    "/api/v1/auth/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Create an account",
+        "description": "Always answers 202 for a valid request, even when the email already has an account; the confirmation link arrives by email.",
+        "operationId": "Register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/confirm-email": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Confirm an email address with the userId and token from the confirmation link",
+        "operationId": "ConfirmEmail",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmEmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/confirm-email/resend": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Send the confirmation email again",
+        "description": "Always answers 202, so it cannot be used to find out which emails are registered.",
+        "operationId": "ResendEmailConfirmation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendConfirmationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/username-availability": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Check whether a username can be registered",
+        "operationId": "GetUsernameAvailability",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsernameAvailabilityResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Sign in with email or username and password",
+        "description": "Web apps send useCookie=true and receive an httpOnly cookie (204). Native apps receive an access token and a refresh token (200).",
+        "operationId": "Login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Exchange a refresh token for a new access token and refresh token",
+        "description": "Refresh tokens are single use. Presenting a used token again ends the session on every device that shares it.",
+        "operationId": "RefreshTokens",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "End the current session (this device)",
+        "operationId": "Logout",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed: a cookie write without the X-CSRF header, or a role the caller lacks.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "Cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/logout-all": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "End every session of the signed-in user (all devices)",
+        "operationId": "LogoutAll",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed: a cookie write without the X-CSRF header, or a role the caller lacks.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "Cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/password/forgot": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Email a password-reset link (valid for one hour)",
+        "description": "Always answers 202, so it cannot be used to find out which emails are registered.",
+        "operationId": "ForgotPassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password/reset": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Set a new password with the userId and token from the reset link; signs out every device",
+        "operationId": "ResetPassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "The signed-in user's account and settings",
+        "operationId": "GetMe",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed: a cookie write without the X-CSRF header, or a role the caller lacks.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "Cookie": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Delete my account permanently (asks for the password again)",
+        "operationId": "DeleteMyAccount",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed: a cookie write without the X-CSRF header, or a role the caller lacks.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "Cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/profile": {
+      "put": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Display name and bio",
+        "operationId": "PutMyProfile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed: a cookie write without the X-CSRF header, or a role the caller lacks.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "Cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/settings": {
+      "put": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Profile visibility, language, time zone and avatar",
+        "operationId": "PutMySettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed: a cookie write without the X-CSRF header, or a role the caller lacks.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "Cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/username": {
+      "put": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Change the username (at most once every 30 days)",
+        "operationId": "PutMyUsername",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UsernameRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed: a cookie write without the X-CSRF header, or a role the caller lacks.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "Cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/goals/{year}": {
+      "put": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Set this year's targets (missions); replaces every target of that year",
+        "operationId": "PutMyGoals",
+        "parameters": [
+          {
+            "name": "year",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "maximum": 2100,
+              "minimum": 2000,
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoalsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed: a cookie write without the X-CSRF header, or a role the caller lacks.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "Cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/password": {
+      "post": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Change the password; other devices are signed out",
+        "operationId": "ChangeMyPassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed: a cookie write without the X-CSRF header, or a role the caller lacks.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "Cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/item-types": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Item types, their allowed statuses with TR/EN labels, progress units and provider attribution",
+        "operationId": "GetItemTypes",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemTypesResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/search": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Search a provider for items of one type",
+        "description": "Hits that are already in the catalog carry their id; for the rest, call /items/import with the ref. Debounce input (300 ms) and send at least 2 characters.",
+        "operationId": "SearchCatalog",
+        "parameters": [
+          {
+            "name": "Q",
+            "in": "query",
+            "description": "Search text, 2-100 characters.",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "name": "Type",
+            "in": "query",
+            "description": "Which kind of item to search for: book, movie, series, game, anime or manga.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Cursor",
+            "in": "query",
+            "description": "The nextCursor of the previous page.",
+            "schema": {
+              "maxLength": 64,
+              "minLength": 0,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/items/import": {
+      "post": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Add a search result to the catalog",
+        "description": "Safe to repeat: 201 when the item is new, 200 with the existing item otherwise. Call it when a search hit has no id, then add the id to your shelf.",
+        "operationId": "ImportItem",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportItemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed: a cookie write without the X-CSRF header, or a role the caller lacks.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "Cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/items/{id}": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Item details",
+        "operationId": "GetItem",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/items": {
+      "post": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Add a book that search cannot find; it is reviewed before others can see it",
+        "operationId": "AddManualBook",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualBookRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed: a cookie write without the X-CSRF header, or a role the caller lacks.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "Cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/ranks": {
+      "get": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Belt ranks with TR/EN names, point thresholds and colors",
+        "operationId": "GetRanks",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Belt"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/avatars/{file}": {
+      "get": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "A built-in ninja avatar as SVG, its belt painted in the given belt color",
+        "operationId": "GetAvatar",
+        "parameters": [
+          {
+            "name": "file",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "belt",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/shelf": {
+      "get": {
+        "tags": [
+          "Shelf"
+        ],
+        "summary": "My shelf, filtered and sorted, one page at a time",
+        "operationId": "GetMyShelf",
+        "parameters": [
+          {
+            "name": "Type",
+            "in": "query",
+            "description": "book, movie, series, game, anime or manga.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Status",
+            "in": "query",
+            "description": "Repeat to match several: status=completed&amp;status=dropped.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "Favorite",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "Year",
+            "in": "query",
+            "description": "Items finished in this year.",
+            "schema": {
+              "maximum": 3000,
+              "minimum": 1000,
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Sort",
+            "in": "query",
+            "description": "One field, \"-\" for descending: -updatedAt (default), createdAt, finishedOn, rating.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Cursor",
+            "in": "query",
+            "description": "The nextCursor of the previous page.",
+            "schema": {
+              "maxLength": 512,
+              "minLength": 0,
+              "type": "string"
+            }
+          },
+          {
+            "name": "Limit",
+            "in": "query",
+            "description": "Page size, 1-50 (default 24).",
+            "schema": {
+              "maximum": 50,
+              "minimum": 1,
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShelfPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed: a cookie write without the X-CSRF header, or a role the caller lacks.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "Cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/shelf/{itemId}": {
+      "get": {
+        "tags": [
+          "Shelf"
+        ],
+        "summary": "My entry for an item, with its ETag",
+        "operationId": "GetShelfEntry",
+        "parameters": [
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShelfEntryResponse"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed: a cookie write without the X-CSRF header, or a role the caller lacks.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "Cookie": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Shelf"
+        ],
+        "summary": "Add an item to my shelf or replace its entry",
+        "description": "201 when created, 200 when replaced. Send If-Match with the ETag to avoid overwriting a change made on another device (412 on mismatch); send If-None-Match: * to only create.",
+        "operationId": "PutShelfEntry",
+        "parameters": [
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShelfEntryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShelfEntryResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShelfEntryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed: a cookie write without the X-CSRF header, or a role the caller lacks.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "Cookie": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Shelf"
+        ],
+        "summary": "Remove an item from my shelf",
+        "description": "Always 204, also when the item was not on the shelf, so retries are safe.",
+        "operationId": "DeleteShelfEntry",
+        "parameters": [
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed: a cookie write without the X-CSRF header, or a role the caller lacks.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "Cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/users/{username}": {
+      "get": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "A user's public profile: belt, counts, this year and favorites",
+        "operationId": "GetPublicProfile",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicProfileResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/{username}/shelf": {
+      "get": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Another user's shelf, with the same filters as /me/shelf",
+        "operationId": "GetUserShelf",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Type",
+            "in": "query",
+            "description": "book, movie, series, game, anime or manga.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Status",
+            "in": "query",
+            "description": "Repeat to match several: status=completed&amp;status=dropped.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "Favorite",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "Year",
+            "in": "query",
+            "description": "Items finished in this year.",
+            "schema": {
+              "maximum": 3000,
+              "minimum": 1000,
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Sort",
+            "in": "query",
+            "description": "One field, \"-\" for descending: -updatedAt (default), createdAt, finishedOn, rating.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Cursor",
+            "in": "query",
+            "description": "The nextCursor of the previous page.",
+            "schema": {
+              "maxLength": 512,
+              "minLength": 0,
+              "type": "string"
+            }
+          },
+          {
+            "name": "Limit",
+            "in": "query",
+            "description": "Page size, 1-50 (default 24).",
+            "schema": {
+              "maximum": 50,
+              "minimum": 1,
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShelfPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/{username}/stats": {
+      "get": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Yearly reading/watching/playing stats: completions per type and month, average ratings, pages and episodes",
+        "operationId": "GetUserStats",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "schema": {
+              "maximum": 3000,
+              "minimum": 1000,
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/{username}/goals/{year}": {
+      "get": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "A user's targets for a year with progress",
+        "operationId": "GetUserGoals",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "year",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "maximum": 2100,
+              "minimum": 2000,
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/items/pending": {
+      "get": {
+        "tags": [
+          "Moderation"
+        ],
+        "summary": "Manually added items waiting for review, oldest first",
+        "operationId": "GetPendingItems",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PendingItem"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed: a cookie write without the X-CSRF header, or a role the caller lacks.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "Cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/items/{id}/approve": {
+      "post": {
+        "tags": [
+          "Moderation"
+        ],
+        "summary": "Make the item visible to everyone",
+        "operationId": "ApproveItem",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed: a cookie write without the X-CSRF header, or a role the caller lacks.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "Cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/items/{id}/reject": {
+      "post": {
+        "tags": [
+          "Moderation"
+        ],
+        "summary": "Keep the item hidden (it stays on its creator's shelf)",
+        "operationId": "RejectItem",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; retry after the number of seconds in Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed: a cookie write without the X-CSRF header, or a role the caller lacks.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "Cookie": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Belt": {
+        "required": [
+          "code",
+          "label",
+          "minPoints",
+          "color"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Stable code: white, yellow, orange, green, blue, brown, black."
+          },
+          "label": {
+            "description": "Display name.",
+            "$ref": "#/components/schemas/LocalizedText"
+          },
+          "minPoints": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Points needed to reach this belt.",
+            "format": "int32"
+          },
+          "color": {
+            "type": "string",
+            "description": "Hex color used to paint the avatar's belt."
+          }
+        }
+      },
+      "CatalogStatus": {
+        "enum": [
+          "approved",
+          "pendingReview",
+          "rejected"
+        ],
+        "description": "Manually added items wait for a moderator before other users can find them."
+      },
+      "ChangePasswordRequest": {
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "newPassword": {
+            "maxLength": 128,
+            "minLength": 12,
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ConfirmEmailRequest": {
+        "required": [
+          "userId",
+          "token"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "token": {
+            "maxLength": 2048,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "DeleteAccountRequest": {
+        "required": [
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ForgotPasswordRequest": {
+        "required": [
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "maxLength": 254,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "GoalProgress": {
+        "required": [
+          "type",
+          "target",
+          "completed",
+          "percent"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "description": "Item type.",
+            "$ref": "#/components/schemas/ItemType"
+          },
+          "target": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "How many to complete this year.",
+            "format": "int32"
+          },
+          "completed": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Completed so far (by finish date).",
+            "format": "int32"
+          },
+          "percent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "0-100.",
+            "format": "int32"
+          }
+        }
+      },
+      "GoalsRequest": {
+        "required": [
+          "targets"
+        ],
+        "type": "object",
+        "properties": {
+          "targets": {
+            "maxItems": 6,
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/GoalTarget"
+            }
+          }
+        }
+      },
+      "GoalsResponse": {
+        "required": [
+          "year",
+          "goals"
+        ],
+        "type": "object",
+        "properties": {
+          "year": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "goals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoalProgress"
+            }
+          }
+        }
+      },
+      "GoalTarget": {
+        "required": [
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ItemType"
+              }
+            ]
+          },
+          "target": {
+            "maximum": 10000,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "HttpValidationProblemDetails": {
+        "required": [
+          "code"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "code": {
+            "type": "string",
+            "description": "Stable snake_case error code to switch on and translate."
+          },
+          "traceId": {
+            "type": "string",
+            "description": "Identifies the request in logs; include it in bug reports."
+          }
+        }
+      },
+      "ImportItemRequest": {
+        "required": [
+          "ref"
+        ],
+        "type": "object",
+        "properties": {
+          "ref": {
+            "maxLength": 150,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The \"ref\" of a search result, e.g. \"tmdb:movie:603\"."
+          }
+        }
+      },
+      "ItemDetails": {
+        "required": [
+          "isbn13",
+          "publisher",
+          "runtimeMinutes",
+          "seasonCount",
+          "platforms",
+          "format",
+          "volumeCount"
+        ],
+        "type": "object",
+        "properties": {
+          "isbn13": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "publisher": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "runtimeMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "seasonCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "format": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "volumeCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "ItemResponse": {
+        "required": [
+          "id",
+          "type",
+          "title",
+          "originalTitle",
+          "year",
+          "description",
+          "coverUrl",
+          "creators",
+          "genres",
+          "progressTotal",
+          "source",
+          "ref",
+          "catalogStatus",
+          "details"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Kunai item id.",
+            "format": "uuid"
+          },
+          "type": {
+            "description": "Item type.",
+            "$ref": "#/components/schemas/ItemType"
+          },
+          "title": {
+            "type": "string",
+            "description": "Display title."
+          },
+          "originalTitle": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Original-language title, when different."
+          },
+          "year": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "Release or publication year.",
+            "format": "int32"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Plain-text synopsis."
+          },
+          "coverUrl": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "HTTPS cover image, hosted by the provider."
+          },
+          "creators": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Authors, directors, developers or studios."
+          },
+          "genres": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Genres as the provider names them."
+          },
+          "progressTotal": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "Pages, episodes or chapters, when known.",
+            "format": "int32"
+          },
+          "source": {
+            "description": "Metadata provider; show its attribution (see /item-types).",
+            "$ref": "#/components/schemas/ItemSource"
+          },
+          "ref": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Provider reference such as \"tmdb:movie:603\"; null for manual items."
+          },
+          "catalogStatus": {
+            "description": "approved, or pendingReview/rejected for manual items.",
+            "$ref": "#/components/schemas/CatalogStatus"
+          },
+          "details": {
+            "description": "Type-specific fields; the ones that do not apply are null.",
+            "$ref": "#/components/schemas/ItemDetails"
+          }
+        }
+      },
+      "ItemSource": {
+        "enum": [
+          "tmdb",
+          "googleBooks",
+          "openLibrary",
+          "igdb",
+          "aniList",
+          "manual"
+        ],
+        "description": "Where an item's metadata comes from."
+      },
+      "ItemSummary": {
+        "required": [
+          "id",
+          "type",
+          "title",
+          "year",
+          "coverUrl",
+          "creators",
+          "progressTotal"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ItemType"
+          },
+          "title": {
+            "type": "string"
+          },
+          "year": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "coverUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "creators": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "progressTotal": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "The few item fields a shelf or profile list needs."
+      },
+      "ItemType": {
+        "enum": [
+          "book",
+          "movie",
+          "series",
+          "game",
+          "anime",
+          "manga"
+        ]
+      },
+      "ItemTypeDefinition": {
+        "required": [
+          "type",
+          "name",
+          "statuses",
+          "progressUnit",
+          "sources",
+          "rankPoints"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "description": "The item type.",
+            "$ref": "#/components/schemas/ItemType"
+          },
+          "name": {
+            "description": "Display name, singular.",
+            "$ref": "#/components/schemas/LocalizedText"
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatusDefinition"
+            },
+            "description": "The statuses this type allows, in display order, with their labels."
+          },
+          "progressUnit": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "What progress counts (pages, episodes...); null when progress is not tracked.",
+                "$ref": "#/components/schemas/ProgressUnit"
+              }
+            ]
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemSource"
+            },
+            "description": "Providers searched for this type."
+          },
+          "rankPoints": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Belt points earned for each completed item of this type.",
+            "format": "int32"
+          }
+        }
+      },
+      "ItemTypesResponse": {
+        "required": [
+          "types",
+          "sources"
+        ],
+        "type": "object",
+        "properties": {
+          "types": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemTypeDefinition"
+            }
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceAttribution"
+            }
+          }
+        }
+      },
+      "LocalizedText": {
+        "required": [
+          "tr",
+          "en"
+        ],
+        "type": "object",
+        "properties": {
+          "tr": {
+            "type": "string"
+          },
+          "en": {
+            "type": "string"
+          }
+        },
+        "description": "A label in both languages, so one cacheable response serves every client."
+      },
+      "LoginRequest": {
+        "required": [
+          "login",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "login": {
+            "maxLength": 254,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Email address or username."
+          },
+          "password": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "useCookie": {
+            "type": "boolean",
+            "description": "True for browsers: the session lives in an httpOnly cookie instead of tokens."
+          },
+          "deviceName": {
+            "maxLength": 100,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Optional label shown in the device list, e.g. \"iPhone 17\"."
+          }
+        }
+      },
+      "ManualBookRequest": {
+        "required": [
+          "title"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authors": {
+            "maxItems": 10,
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "year": {
+            "maximum": 3000,
+            "minimum": 1000,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "isbn13": {
+            "pattern": "^97[89][0-9]{10}$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "13 digits, no dashes; checked with its check digit."
+          },
+          "pageCount": {
+            "maximum": 100000,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "publisher": {
+            "maxLength": 200,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "maxLength": 5000,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "MeResponse": {
+        "required": [
+          "id",
+          "username",
+          "email",
+          "displayName",
+          "bio",
+          "avatarId",
+          "isProfilePublic",
+          "locale",
+          "timeZone",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "username": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "bio": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "avatarId": {
+            "type": "string"
+          },
+          "isProfilePublic": {
+            "type": "boolean"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "timeZone": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PendingItem": {
+        "required": [
+          "item",
+          "createdByUserId",
+          "submittedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/ItemResponse"
+          },
+          "createdByUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who added it.",
+            "format": "uuid"
+          },
+          "submittedAt": {
+            "type": "string",
+            "description": "When it was added.",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProblemDetails": {
+        "required": [
+          "code"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "description": "Stable snake_case error code to switch on and translate."
+          },
+          "traceId": {
+            "type": "string",
+            "description": "Identifies the request in logs; include it in bug reports."
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Field name (camelCase) to error codes; present on validation problems."
+          }
+        }
+      },
+      "ProfileRequest": {
+        "required": [
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "maxLength": 50,
+            "minLength": 1,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "bio": {
+            "maxLength": 300,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ProgressUnit": {
+        "enum": [
+          "page",
+          "episode",
+          "chapter",
+          "percent",
+          null
+        ]
+      },
+      "PublicProfileResponse": {
+        "required": [
+          "username",
+          "displayName",
+          "bio",
+          "avatarUrl",
+          "joinedAt",
+          "rank",
+          "counts",
+          "thisYear",
+          "favorites"
+        ],
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "Public handle."
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Display name."
+          },
+          "bio": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Short bio."
+          },
+          "avatarUrl": {
+            "type": "string",
+            "description": "Relative URL of the ninja avatar, painted with the current belt."
+          },
+          "joinedAt": {
+            "type": "string",
+            "description": "When the account was created.",
+            "format": "date-time"
+          },
+          "rank": {
+            "description": "Current belt and progress to the next one.",
+            "$ref": "#/components/schemas/RankResponse"
+          },
+          "counts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TypeCounts"
+            },
+            "description": "Entries per type and status."
+          },
+          "thisYear": {
+            "description": "Items completed this calendar year (in the user's time zone).",
+            "$ref": "#/components/schemas/ThisYearResponse"
+          },
+          "favorites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemSummary"
+            },
+            "description": "Most recently favorited items."
+          }
+        }
+      },
+      "RankResponse": {
+        "required": [
+          "code",
+          "label",
+          "points",
+          "nextCode",
+          "nextAt"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Current belt code."
+          },
+          "label": {
+            "description": "Current belt name.",
+            "$ref": "#/components/schemas/LocalizedText"
+          },
+          "points": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Points earned so far.",
+            "format": "int32"
+          },
+          "nextCode": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The next belt, or null at black belt."
+          },
+          "nextAt": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "Points needed for the next belt, or null at black belt.",
+            "format": "int32"
+          }
+        }
+      },
+      "RefreshRequest": {
+        "required": [
+          "refreshToken"
+        ],
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "RegisterRequest": {
+        "required": [
+          "email",
+          "username",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "maxLength": 254,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "username": {
+            "maxLength": 24,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "3-24 characters: lowercase letters, digits and underscores, starting with a letter."
+          },
+          "password": {
+            "maxLength": 128,
+            "minLength": 12,
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "12-128 characters. Passwords found in known breaches are rejected."
+          },
+          "displayName": {
+            "maxLength": 50,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "locale": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "\"tr\" (default) or \"en\"; used for emails."
+          }
+        }
+      },
+      "ResendConfirmationRequest": {
+        "required": [
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "maxLength": 254,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ResetPasswordRequest": {
+        "required": [
+          "userId",
+          "token",
+          "newPassword"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "token": {
+            "maxLength": 2048,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "newPassword": {
+            "maxLength": 128,
+            "minLength": 12,
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SearchItem": {
+        "required": [
+          "ref",
+          "id",
+          "type",
+          "title",
+          "year",
+          "subtitle",
+          "coverUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Provider reference; send it to /items/import when Id is null. Null for manually added books."
+          },
+          "id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The catalog id when the item was already imported.",
+            "format": "uuid"
+          },
+          "type": {
+            "description": "Item type.",
+            "$ref": "#/components/schemas/ItemType"
+          },
+          "title": {
+            "type": "string",
+            "description": "Display title."
+          },
+          "year": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "Release or publication year.",
+            "format": "int32"
+          },
+          "subtitle": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Secondary line: authors, original title, platforms..."
+          },
+          "coverUrl": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "HTTPS cover image."
+          }
+        }
+      },
+      "SearchResponse": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchItem"
+            },
+            "description": "Search hits in the provider's relevance order."
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Pass as \"cursor\" to get the next page; null on the last page."
+          }
+        }
+      },
+      "SettingsRequest": {
+        "required": [
+          "isProfilePublic",
+          "locale",
+          "timeZone",
+          "avatarId"
+        ],
+        "type": "object",
+        "properties": {
+          "isProfilePublic": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "Private profiles answer 404 to everyone else."
+          },
+          "locale": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "timeZone": {
+            "maxLength": 64,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "IANA time zone, e.g. Europe/Istanbul."
+          },
+          "avatarId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "ninja-01 ... ninja-12."
+          }
+        }
+      },
+      "ShelfEntryRequest": {
+        "required": [
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ShelfStatus"
+              }
+            ]
+          },
+          "rating": {
+            "maximum": 10,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "1-10; not allowed while planned.",
+            "format": "int32"
+          },
+          "startedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Calendar date in the user's time zone (yyyy-MM-dd).",
+            "format": "date"
+          },
+          "finishedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Calendar date in the user's time zone; counts toward that year's stats and goals.",
+            "format": "date"
+          },
+          "progress": {
+            "maximum": 100000,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "Pages, episodes, chapters or percent, depending on the item type (see /item-types).",
+            "format": "int32"
+          },
+          "review": {
+            "maxLength": 2000,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isFavorite": {
+            "type": "boolean"
+          }
+        },
+        "description": "The full state of a shelf entry; PUT replaces every field."
+      },
+      "ShelfEntryResponse": {
+        "required": [
+          "item",
+          "status",
+          "rating",
+          "startedOn",
+          "finishedOn",
+          "progress",
+          "review",
+          "isFavorite",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/ItemSummary"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ShelfStatus"
+          },
+          "rating": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "startedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "finishedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "progress": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "review": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isFavorite": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ShelfPage": {
+        "required": [
+          "items",
+          "nextCursor",
+          "totalCount"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShelfEntryResponse"
+            },
+            "description": "The entries on this page."
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Pass as \"cursor\" for the next page; null on the last page."
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "How many entries match the filters in total.",
+            "format": "int32"
+          }
+        }
+      },
+      "ShelfStatus": {
+        "enum": [
+          "planned",
+          "inProgress",
+          "completed",
+          "dropped",
+          "paused"
+        ],
+        "description": "One status vocabulary for every type; each type allows a subset and labels it its own way."
+      },
+      "SourceAttribution": {
+        "required": [
+          "source",
+          "name",
+          "url",
+          "notice"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "description": "The provider.",
+            "$ref": "#/components/schemas/ItemSource"
+          },
+          "name": {
+            "type": "string",
+            "description": "Provider name to display."
+          },
+          "url": {
+            "type": "string",
+            "description": "Link to the provider.",
+            "format": "uri"
+          },
+          "notice": {
+            "type": "string",
+            "description": "Attribution text that must be shown where the data appears."
+          }
+        }
+      },
+      "StatsResponse": {
+        "required": [
+          "year",
+          "availableYears",
+          "types",
+          "completedByMonth",
+          "pagesRead",
+          "episodesWatched",
+          "chaptersRead"
+        ],
+        "type": "object",
+        "properties": {
+          "year": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The year these numbers cover.",
+            "format": "int32"
+          },
+          "availableYears": {
+            "type": "array",
+            "items": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            },
+            "description": "Years with at least one completion, newest first."
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TypeStats"
+            },
+            "description": "Completions and average rating per type."
+          },
+          "completedByMonth": {
+            "type": "array",
+            "items": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            },
+            "description": "Twelve numbers, January first."
+          },
+          "pagesRead": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Total pages of the books completed (when the page count is known).",
+            "format": "int32"
+          },
+          "episodesWatched": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Total episodes of the series and anime completed.",
+            "format": "int32"
+          },
+          "chaptersRead": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Total chapters of the manga completed.",
+            "format": "int32"
+          }
+        }
+      },
+      "StatusDefinition": {
+        "required": [
+          "status",
+          "label"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/ShelfStatus"
+          },
+          "label": {
+            "$ref": "#/components/schemas/LocalizedText"
+          }
+        }
+      },
+      "ThisYearResponse": {
+        "required": [
+          "year",
+          "completed"
+        ],
+        "type": "object",
+        "properties": {
+          "year": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "completed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TypeCount"
+            }
+          }
+        }
+      },
+      "TokenResponse": {
+        "required": [
+          "accessToken",
+          "tokenType",
+          "expiresIn",
+          "refreshToken"
+        ],
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "ES256 JWT; send it as \"Authorization: Bearer ...\"."
+          },
+          "tokenType": {
+            "type": "string",
+            "description": "Always \"Bearer\"."
+          },
+          "expiresIn": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Access token lifetime in seconds.",
+            "format": "int32"
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Single use. Exchange it at /auth/refresh before the session expires; never refresh twice in parallel."
+          }
+        }
+      },
+      "TypeCount": {
+        "required": [
+          "type",
+          "count"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/ItemType"
+          },
+          "count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "TypeCounts": {
+        "required": [
+          "type",
+          "planned",
+          "inProgress",
+          "completed",
+          "paused",
+          "dropped"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/ItemType"
+          },
+          "planned": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "inProgress": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "completed": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "paused": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "dropped": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "TypeStats": {
+        "required": [
+          "type",
+          "completed",
+          "averageRating"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/ItemType"
+          },
+          "completed": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "averageRating": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "UsernameAvailabilityResponse": {
+        "required": [
+          "username",
+          "available",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "The normalized (lowercase) username that was checked."
+          },
+          "available": {
+            "type": "boolean",
+            "description": "True when the username can be registered right now."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "username_invalid, username_reserved or username_taken when not available."
+          }
+        }
+      },
+      "UsernameRequest": {
+        "required": [
+          "username"
+        ],
+        "type": "object",
+        "properties": {
+          "username": {
+            "maxLength": 24,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "type": "http",
+        "description": "Native apps: the access token from /auth/login or /auth/refresh.",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "Cookie": {
+        "type": "apiKey",
+        "description": "Web app: set by /auth/login with useCookie=true. Requests that change data must also send 'X-CSRF: 1'.",
+        "name": "__Host-kunai",
+        "in": "cookie"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Auth"
+    },
+    {
+      "name": "Me"
+    },
+    {
+      "name": "Catalog"
+    },
+    {
+      "name": "Profiles"
+    },
+    {
+      "name": "Shelf"
+    },
+    {
+      "name": "Moderation"
+    }
+  ]
+}

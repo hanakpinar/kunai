@@ -1,0 +1,53 @@
+@page "/confirm-email"
+@using Microsoft.Kiota.Abstractions
+@inject KunaiApiClient Api
+
+<PageTitle>E-posta onayı · Kunai</PageTitle>
+
+<section class="auth-card">
+    @if (_confirmed is null)
+    {
+        <Spinner Label="Onaylanıyor…" />
+    }
+    else if (_confirmed == true)
+    {
+        <h1>E-postan onaylandı 🎯</h1>
+        <p>Artık giriş yapıp rafını doldurmaya başlayabilirsin.</p>
+        <a class="button button--block" href="login">Giriş yap</a>
+    }
+    else
+    {
+        <h1>Bağlantı geçersiz</h1>
+        <p>Bağlantı kullanılmış ya da süresi dolmuş olabilir. Giriş sayfasından yeni bir onay e-postası isteyebilirsin.</p>
+        <a class="button button--block" href="login">Giriş sayfasına git</a>
+    }
+</section>
+
+@code {
+    private bool? _confirmed;
+
+    [SupplyParameterFromQuery]
+    public Guid? UserId { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? Token { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (UserId is null || string.IsNullOrEmpty(Token))
+        {
+            _confirmed = false;
+            return;
+        }
+
+        try
+        {
+            await Api.Api.V1.Auth.ConfirmEmail.PostAsync(new ConfirmEmailRequest { UserId = UserId, Token = Token });
+            _confirmed = true;
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        {
+            _confirmed = false;
+        }
+    }
+}

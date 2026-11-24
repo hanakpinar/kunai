@@ -1,0 +1,12 @@
+@if (Rank is not null)
+{
+    <span class="belt belt--@Rank.Code" title="@($"{Rank.Points} puan")">
+        <span class="belt__knot" aria-hidden="true"></span>
+        @Rank.Label?.Tr
+    </span>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public RankResponse? Rank { get; set; }
+}

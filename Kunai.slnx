@@ -3,6 +3,8 @@
     <Project Path="src/Kunai.Api/Kunai.Api.csproj" />
     <Project Path="src/Kunai.AppHost/Kunai.AppHost.csproj" />
     <Project Path="src/Kunai.ServiceDefaults/Kunai.ServiceDefaults.csproj" />
+    <Project Path="src/Kunai.Web.Client/Kunai.Web.Client.csproj" />
+    <Project Path="src/Kunai.Web/Kunai.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Kunai.Api.IntegrationTests/Kunai.Api.IntegrationTests.csproj" />

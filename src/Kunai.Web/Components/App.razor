@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Kunai: okuduğun, izlediğin ve oynadığın her şey tek rafta." />
+    <base href="/" />
+    <title>Kunai</title>
+    <link rel="icon" type="image/svg+xml" href="@Assets["favicon.svg"]" />
+    <ResourcePreloader />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["Kunai.Web.styles.css"]" />
+    <ImportMap />
+    <HeadOutlet @rendermode="RenderMode" />
+</head>
+
+<body>
+    <div class="app-loading" aria-live="polite">
+        <img src="@Assets["favicon.svg"]" alt="" width="56" height="56" />
+        <span>Kunai yükleniyor…</span>
+    </div>
+    <Routes @rendermode="RenderMode" />
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+</body>
+
+</html>
+
+@code {
+    // The whole UI runs in the browser (WebAssembly). Pages are not prerendered on the server, because
+    // signed-in data comes from the API through the browser's cookie.
+    private static readonly IComponentRenderMode RenderMode = new InteractiveWebAssemblyRenderMode(prerender: false);
+}

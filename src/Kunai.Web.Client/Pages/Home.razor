@@ -1,0 +1,106 @@
+@page "/"
+@using Microsoft.Kiota.Abstractions
+@inject KunaiApiClient Api
+@inject AuthSession Session
+
+<PageTitle>Kunai</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <section class="welcome">
+            <h1>Merhaba, @(Session.Me?.DisplayName ?? context.User.Identity?.Name)</h1>
+            <p class="muted">Bugün hangi hedefi vuruyoruz?</p>
+        </section>
+
+        <section class="section">
+            <header class="section__header">
+                <h2>Devam ettiklerin</h2>
+                <a href="shelf?status=inProgress">Tümü</a>
+            </header>
+            @if (_inProgress is null)
+            {
+                <Spinner />
+            }
+            else if (_inProgress.Count == 0)
+            {
+                <EmptyState Message="Şu an yarım kalan bir şey yok. Yukarıdaki arama kutusundan yeni bir hedef bul." />
+            }
+            else
+            {
+                <div class="card-grid">
+                    @foreach (var entry in _inProgress)
+                    {
+                        <ItemCard Href="@($"items/{entry.Item?.Id}")" Title="@(entry.Item?.Title ?? string.Empty)" Type="entry.Item?.Type" Year="entry.Item?.Year" CoverUrl="@entry.Item?.CoverUrl">
+                            <StatusBadge Type="entry.Item?.Type" Status="entry.Status" />
+                            @if (entry.Progress is not null)
+                            {
+                                <span class="muted small">@entry.Progress@(entry.Item?.ProgressTotal is > 0 ? $" / {entry.Item.ProgressTotal}" : string.Empty)</span>
+                            }
+                        </ItemCard>
+                    }
+                </div>
+            }
+        </section>
+
+        <section class="section">
+            <header class="section__header">
+                <h2>Son hareketler</h2>
+                <a href="shelf">Rafım</a>
+            </header>
+            @if (_recent is { Count: > 0 })
+            {
+                <div class="card-grid">
+                    @foreach (var entry in _recent)
+                    {
+                        <ItemCard Href="@($"items/{entry.Item?.Id}")" Title="@(entry.Item?.Title ?? string.Empty)" Type="entry.Item?.Type" Year="entry.Item?.Year" CoverUrl="@entry.Item?.CoverUrl">
+                            <StatusBadge Type="entry.Item?.Type" Status="entry.Status" />
+                        </ItemCard>
+                    }
+                </div>
+            }
+        </section>
+    </Authorized>
+    <NotAuthorized>
+        <section class="hero">
+            <img src="favicon.svg" alt="" width="96" height="96" />
+            <h1>Oku. İzle. Oyna. <span class="accent">Hedefi vur.</span></h1>
+            <p>Kitaplar, filmler, diziler, oyunlar, anime ve manga: bitirdiğin her şey tek rafta. Bitirdikçe kuşağın yükselsin, yıllık görevlerini tamamla.</p>
+            <div class="hero__actions">
+                <a class="button" href="register">Rafını kur</a>
+                <a class="button button--ghost" href="login">Giriş yap</a>
+            </div>
+        </section>
+        <section class="features">
+            <article><h3>🥷 Kuşak sistemi</h3><p>Beyaz kuşaktan siyaha: bitirdiğin her içerik puan kazandırır.</p></article>
+            <article><h3>🎯 Yıllık görevler</h3><p>"Bu yıl 30 kitap" gibi hedefler koy, ilerlemeni takip et.</p></article>
+            <article><h3>📚 Tek raf</h3><p>Okuyacakların, izlediklerin, yarım bıraktıkların; hepsi bir arada.</p></article>
+        </section>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private List<ShelfEntryResponse>? _inProgress;
+    private List<ShelfEntryResponse>? _recent;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await Session.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var inProgress = Api.Api.V1.Me.Shelf.GetAsync(c => { c.QueryParameters.Status = ["inProgress"]; c.QueryParameters.Limit = 12; });
+            var recent = Api.Api.V1.Me.Shelf.GetAsync(c => { c.QueryParameters.Sort = "-updatedAt"; c.QueryParameters.Limit = 6; });
+            _inProgress = (await inProgress)?.Items ?? [];
+            _recent = (await recent)?.Items ?? [];
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        {
+            _inProgress = [];
+            _recent = [];
+        }
+    }
+}

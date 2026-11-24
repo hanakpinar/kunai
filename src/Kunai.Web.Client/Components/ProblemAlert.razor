@@ -1,0 +1,20 @@
+@if (Problem is not null)
+{
+    <div class="alert alert--error" role="alert">
+        <strong>@Problem.Message</strong>
+        @if (Problem.Fields.Count > 0)
+        {
+            <ul>
+                @foreach (var (_, message) in Problem.Fields)
+                {
+                    <li>@message</li>
+                }
+            </ul>
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public ApiProblem? Problem { get; set; }
+}

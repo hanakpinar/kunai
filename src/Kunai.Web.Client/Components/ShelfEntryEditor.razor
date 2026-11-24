@@ -1,0 +1,222 @@
+@using Microsoft.Kiota.Abstractions
+@inject KunaiApiClient Api
+@inject CatalogMetadata Catalog
+
+<div class="dialog-backdrop" @onclick="CancelAsync"></div>
+<section class="dialog" role="dialog" aria-modal="true" aria-labelledby="entry-editor-title">
+    <header class="dialog__header">
+        <h2 id="entry-editor-title">@Title</h2>
+        <button type="button" class="icon-button" aria-label="Kapat" @onclick="CancelAsync">✕</button>
+    </header>
+
+    @if (_definition is null)
+    {
+        <Spinner />
+    }
+    else
+    {
+        <EditForm Model="_form" OnValidSubmit="SaveAsync" class="form">
+            <label class="field">
+                <span>Durum</span>
+                <InputSelect @bind-Value="_form.Status" @bind-Value:after="OnStatusChanged">
+                    @foreach (var status in _definition.Statuses ?? [])
+                    {
+                        <option value="@status.Status">@status.Label?.Tr</option>
+                    }
+                </InputSelect>
+            </label>
+
+            @if (_form.Status != ShelfStatus.Planned)
+            {
+                <label class="field">
+                    <span>Puan</span>
+                    <InputSelect @bind-Value="_form.Rating">
+                        <option value="">Puansız</option>
+                        @for (var score = 10; score >= 1; score--)
+                        {
+                            <option value="@score">@score</option>
+                        }
+                    </InputSelect>
+                </label>
+
+                <div class="field-row">
+                    <label class="field">
+                        <span>Başlangıç</span>
+                        <InputDate @bind-Value="_form.StartedOn" />
+                    </label>
+                    <label class="field">
+                        <span>Bitiş</span>
+                        <InputDate @bind-Value="_form.FinishedOn" />
+                    </label>
+                </div>
+
+                @if (_definition.ProgressUnit is not null)
+                {
+                    <label class="field">
+                        <span>İlerleme (@CatalogMetadata.ProgressUnitName(_definition.ProgressUnit)@(ProgressTotal is > 0 && _definition.ProgressUnit != ProgressUnit.Percent ? $" / {ProgressTotal}" : string.Empty))</span>
+                        <InputNumber @bind-Value="_form.Progress" min="0" max="@MaxProgress" />
+                    </label>
+                }
+            }
+
+            <label class="field">
+                <span>Not</span>
+                <InputTextArea @bind-Value="_form.Review" rows="3" maxlength="2000" placeholder="Kısa bir not ya da inceleme (isteğe bağlı)" />
+            </label>
+
+            <label class="check">
+                <InputCheckbox @bind-Value="_form.IsFavorite" />
+                <span>Favorilerime ekle</span>
+            </label>
+
+            <ProblemAlert Problem="_problem" />
+
+            <footer class="dialog__footer">
+                @if (Existing is not null)
+                {
+                    <button type="button" class="button button--ghost button--danger" disabled="@_busy" @onclick="RemoveAsync">Raftan kaldır</button>
+                }
+                <span class="spacer"></span>
+                <button type="button" class="button button--ghost" @onclick="CancelAsync">Vazgeç</button>
+                <button type="submit" class="button" disabled="@_busy">Kaydet</button>
+            </footer>
+        </EditForm>
+    }
+</section>
+
+@code {
+    private readonly EntryForm _form = new();
+    private ItemTypeDefinition? _definition;
+    private ApiProblem? _problem;
+    private bool _busy;
+
+    [Parameter, EditorRequired]
+    public Guid ItemId { get; set; }
+
+    [Parameter, EditorRequired]
+    public ItemType? ItemType { get; set; }
+
+    [Parameter]
+    public string Title { get; set; } = "Rafa ekle";
+
+    [Parameter]
+    public int? ProgressTotal { get; set; }
+
+    /// <summary>The current entry when editing; null when adding.</summary>
+    [Parameter]
+    public ShelfEntryResponse? Existing { get; set; }
+
+    [Parameter]
+    public EventCallback<ShelfEntryResponse> OnSaved { get; set; }
+
+    [Parameter]
+    public EventCallback OnRemoved { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private int? MaxProgress => _definition?.ProgressUnit == ProgressUnit.Percent ? 100 : ProgressTotal;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _definition = await Catalog.ForAsync(ItemType);
+        if (Existing is not null)
+        {
+            _form.Status = Existing.Status;
+            _form.Rating = Existing.Rating;
+            _form.StartedOn = ToDateOnly(Existing.StartedOn);
+            _form.FinishedOn = ToDateOnly(Existing.FinishedOn);
+            _form.Progress = Existing.Progress;
+            _form.Review = Existing.Review;
+            _form.IsFavorite = Existing.IsFavorite ?? false;
+        }
+        else
+        {
+            _form.Status = _definition?.Statuses?.FirstOrDefault()?.Status ?? ShelfStatus.Planned;
+        }
+    }
+
+    private void OnStatusChanged()
+    {
+        // Dates are the user's own calendar dates: prefill "today" from the device, never from the server.
+        if (_form.Status == ShelfStatus.Completed && _form.FinishedOn is null)
+        {
+            _form.FinishedOn = DateOnly.FromDateTime(DateTime.Now);
+        }
+
+        if (_form.Status == ShelfStatus.InProgress && _form.StartedOn is null)
+        {
+            _form.StartedOn = DateOnly.FromDateTime(DateTime.Now);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        _problem = null;
+        var planned = _form.Status == ShelfStatus.Planned;
+        try
+        {
+            var saved = await Api.Api.V1.Me.Shelf[ItemId].PutAsync(new ShelfEntryRequest
+            {
+                Status = _form.Status,
+                Rating = planned ? null : _form.Rating,
+                StartedOn = planned ? null : ToDate(_form.StartedOn),
+                FinishedOn = planned ? null : ToDate(_form.FinishedOn),
+                Progress = planned || _definition?.ProgressUnit is null ? null : _form.Progress,
+                Review = string.IsNullOrWhiteSpace(_form.Review) ? null : _form.Review,
+                IsFavorite = _form.IsFavorite,
+            });
+            await OnSaved.InvokeAsync(saved);
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        {
+            _problem = ApiProblem.From(exception);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task RemoveAsync()
+    {
+        _busy = true;
+        try
+        {
+            await Api.Api.V1.Me.Shelf[ItemId].DeleteAsync();
+            await OnRemoved.InvokeAsync();
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        {
+            _problem = ApiProblem.From(exception);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private Task CancelAsync() => OnCancel.InvokeAsync();
+
+    private static Date? ToDate(DateOnly? value) => value is { } d ? new Date(d.Year, d.Month, d.Day) : null;
+
+    private static DateOnly? ToDateOnly(Date? value) => value is { } d ? new DateOnly(d.Year, d.Month, d.Day) : null;
+
+    private sealed class EntryForm
+    {
+        public ShelfStatus? Status { get; set; }
+
+        public int? Rating { get; set; }
+
+        public DateOnly? StartedOn { get; set; }
+
+        public DateOnly? FinishedOn { get; set; }
+
+        public int? Progress { get; set; }
+
+        public string? Review { get; set; }
+
+        public bool IsFavorite { get; set; }
+    }
+}

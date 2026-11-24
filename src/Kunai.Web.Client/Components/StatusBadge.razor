@@ -1,0 +1,17 @@
+@inject CatalogMetadata Catalog
+
+<span class="status-badge status-badge--@CssStatus">@_label</span>
+
+@code {
+    private string _label = string.Empty;
+
+    [Parameter, EditorRequired]
+    public ItemType? Type { get; set; }
+
+    [Parameter, EditorRequired]
+    public ShelfStatus? Status { get; set; }
+
+    private string CssStatus => Status?.ToString().ToLowerInvariant() ?? "unknown";
+
+    protected override async Task OnParametersSetAsync() => _label = await Catalog.StatusLabelAsync(Type, Status);
+}

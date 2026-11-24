@@ -12,10 +12,20 @@ var kunaiDb = postgres.AddDatabase("kunaidb", databaseName: "kunai");
 // Catches every email the API sends during development.
 var mailpit = builder.AddMailPit("mailpit");
 
-builder.AddDotnetProject("api", "../Kunai.Api/Kunai.Api.csproj")
+var api = builder.AddDotnetProject("api", "../Kunai.Api/Kunai.Api.csproj")
     .WithReference(kunaiDb)
     .WaitFor(kunaiDb)
     .WithReference(mailpit)
     .WithHttpHealthCheck("/health/ready");
+
+// The Blazor app; it serves the UI and forwards /api to the API, so the browser sees one origin.
+var web = builder.AddDotnetProject("web", "../Kunai.Web/Kunai.Web.csproj")
+    .WithReference(api)
+    .WaitFor(api)
+    .WithExternalHttpEndpoints()
+    .WithHttpHealthCheck("/health/ready");
+
+// Links in emails (confirm, reset password) point to the web app.
+api.WithEnvironment("App__WebBaseUrl", web.GetEndpoint("https"));
 
 builder.Build().Run();

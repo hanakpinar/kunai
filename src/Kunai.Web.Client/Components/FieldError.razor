@@ -1,0 +1,13 @@
+@if (Problem is not null && Problem.Fields.TryGetValue(Field, out var message))
+{
+    <div class="validation-message">@message</div>
+}
+
+@code {
+    [Parameter]
+    public ApiProblem? Problem { get; set; }
+
+    /// <summary>The API's camelCase field name, e.g. "username".</summary>
+    [Parameter, EditorRequired]
+    public string Field { get; set; } = string.Empty;
+}

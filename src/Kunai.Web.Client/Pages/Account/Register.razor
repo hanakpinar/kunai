@@ -1,0 +1,93 @@
+@page "/register"
+@using Microsoft.Kiota.Abstractions
+@inject KunaiApiClient Api
+
+<PageTitle>Kayıt ol · Kunai</PageTitle>
+
+<section class="auth-card">
+    @if (_done)
+    {
+        <h1>E-postanı kontrol et</h1>
+        <p><strong>@_form.Email</strong> adresine bir onay bağlantısı gönderdik. Bağlantıya tıkladıktan sonra giriş yapabilirsin.</p>
+        <a class="button button--block" href="login">Giriş sayfasına git</a>
+    }
+    else
+    {
+        <h1>Rafını kur</h1>
+        <p class="muted">Okuduğun, izlediğin ve oynadığın her şey tek yerde.</p>
+
+        <EditForm Model="_form" OnValidSubmit="SubmitAsync" class="form">
+            <DataAnnotationsValidator />
+            <label class="field">
+                <span>E-posta</span>
+                <InputText type="email" @bind-Value="_form.Email" autocomplete="email" />
+                <ValidationMessage For="() => _form.Email" />
+                <FieldError Problem="_problem" Field="email" />
+            </label>
+            <label class="field">
+                <span>Kullanıcı adı</span>
+                <InputText @bind-Value="_form.Username" autocomplete="username" @bind-Value:after="NormalizeUsername" />
+                <small class="muted">Profil adresin: kunai/u/@(string.IsNullOrEmpty(_form.Username) ? "kullaniciadi" : _form.Username)</small>
+                <ValidationMessage For="() => _form.Username" />
+                <FieldError Problem="_problem" Field="username" />
+            </label>
+            <label class="field">
+                <span>Görünen ad <small class="muted">(isteğe bağlı)</small></span>
+                <InputText @bind-Value="_form.DisplayName" />
+            </label>
+            <label class="field">
+                <span>Şifre</span>
+                <InputText type="password" @bind-Value="_form.Password" autocomplete="new-password" />
+                <small class="muted">En az 12 karakter. Uzun bir cümle iyi bir şifredir.</small>
+                <ValidationMessage For="() => _form.Password" />
+                <FieldError Problem="_problem" Field="password" />
+            </label>
+            <label class="field">
+                <span>Şifre (tekrar)</span>
+                <InputText type="password" @bind-Value="_form.PasswordAgain" autocomplete="new-password" />
+                <ValidationMessage For="() => _form.PasswordAgain" />
+            </label>
+
+            <ProblemAlert Problem="@(_problem is { Fields.Count: 0 } ? _problem : null)" />
+
+            <button type="submit" class="button button--block" disabled="@_busy">Kayıt ol</button>
+        </EditForm>
+
+        <p class="auth-card__links"><a href="login">Zaten hesabın var mı? Giriş yap</a></p>
+    }
+</section>
+
+@code {
+    private readonly RegisterForm _form = new();
+    private ApiProblem? _problem;
+    private bool _busy;
+    private bool _done;
+
+    private void NormalizeUsername() => _form.Username = _form.Username.Trim().ToLowerInvariant();
+
+    private async Task SubmitAsync()
+    {
+        _busy = true;
+        _problem = null;
+        try
+        {
+            await Api.Api.V1.Auth.Register.PostAsync(new RegisterRequest
+            {
+                Email = _form.Email.Trim(),
+                Username = _form.Username,
+                DisplayName = string.IsNullOrWhiteSpace(_form.DisplayName) ? null : _form.DisplayName.Trim(),
+                Password = _form.Password,
+                Locale = "tr",
+            });
+            _done = true;
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        {
+            _problem = ApiProblem.From(exception);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

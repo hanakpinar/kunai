@@ -1,0 +1,46 @@
+<article class="item-card">
+    <a href="@Href" class="item-card__link">
+        <ItemCover Url="@CoverUrl" Title="@Title" />
+        <div class="item-card__body">
+            <span class="item-card__type">@CatalogMetadata.TypeName(Type)</span>
+            <h3 class="item-card__title">@Title</h3>
+            <p class="item-card__meta">
+                @if (Year is not null)
+                {
+                    <span>@Year</span>
+                }
+                @if (!string.IsNullOrEmpty(Subtitle))
+                {
+                    <span>@Subtitle</span>
+                }
+            </p>
+        </div>
+    </a>
+    @if (ChildContent is not null)
+    {
+        <div class="item-card__actions">@ChildContent</div>
+    }
+</article>
+
+@code {
+    [Parameter]
+    public string? Href { get; set; }
+
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public ItemType? Type { get; set; }
+
+    [Parameter]
+    public int? Year { get; set; }
+
+    [Parameter]
+    public string? Subtitle { get; set; }
+
+    [Parameter]
+    public string? CoverUrl { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

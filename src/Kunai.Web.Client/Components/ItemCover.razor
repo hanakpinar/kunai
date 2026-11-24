@@ -1,0 +1,24 @@
+<div class="cover cover--@Size">
+    @if (!string.IsNullOrEmpty(Url))
+    {
+        <img src="@Url" alt="@Title" loading="lazy" referrerpolicy="no-referrer" />
+    }
+    else
+    {
+        <span class="cover__fallback" aria-hidden="true">@Initials</span>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string? Url { get; set; }
+
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>sm, md or lg.</summary>
+    [Parameter]
+    public string Size { get; set; } = "md";
+
+    private string Initials => string.Concat(Title.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => char.ToUpperInvariant(w[0])));
+}

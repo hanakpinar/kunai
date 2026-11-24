@@ -1,0 +1,22 @@
+<img class="avatar avatar--@Size" src="@Src" alt="@Alt" width="@Pixels" height="@Pixels" />
+
+@code {
+    /// <summary>A relative URL from the API, e.g. /api/v1/avatars/ninja-07.svg?belt=green.</summary>
+    [Parameter]
+    public string? Url { get; set; }
+
+    /// <summary>Used when no URL is given: ninja-01 ... ninja-12.</summary>
+    [Parameter]
+    public string? AvatarId { get; set; }
+
+    [Parameter]
+    public string Alt { get; set; } = string.Empty;
+
+    /// <summary>sm, md or lg.</summary>
+    [Parameter]
+    public string Size { get; set; } = "md";
+
+    private string Src => Url ?? $"api/v1/avatars/{AvatarId ?? "ninja-01"}.svg";
+
+    private int Pixels => Size switch { "sm" => 32, "lg" => 112, _ => 56 };
+}
