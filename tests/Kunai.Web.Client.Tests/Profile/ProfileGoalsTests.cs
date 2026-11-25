@@ -4,6 +4,8 @@ using Bunit;
 
 using Kunai.Web.Client.Pages.Profile;
 
+using Microsoft.AspNetCore.Components;
+
 namespace Kunai.Web.Client.Tests.Profile;
 
 public sealed class ProfileGoalsTests : ProfileTestContext
@@ -93,9 +95,15 @@ public sealed class ProfileGoalsTests : ProfileTestContext
     {
         Api.AnswerAsynchronously = true;
         Api.OnProblem(HttpMethod.Get, $"{GoalsPath}/2026", HttpStatusCode.ServiceUnavailable, "service_unavailable");
+        var panelFocused = 0;
         var page = Render<ProfileGoals>(p => p
             .Add(x => x.Username, "ninja")
-            .Add(x => x.Year, 2026));
+            .Add(x => x.Year, 2026)
+            .AddCascadingValue(ProfilePanel.FocusName, (Func<ValueTask>)(() =>
+            {
+                panelFocused++;
+                return ValueTask.CompletedTask;
+            })));
 
         // The alert sits in a wrapper this folder styles (ProblemAlert's own markup is out of reach of scoped CSS).
         page.WaitForAssertion(() => page.Find(".load-problem > .alert--error").TextContent.Should().Contain("Sunucuda bir hata oluştu"));
@@ -104,7 +112,43 @@ public sealed class ProfileGoalsTests : ProfileTestContext
 
         page.WaitForAssertion(() => page.FindAll(".goal").Should().ContainSingle());
         page.FindAll(".load-problem").Should().BeEmpty();
+        panelFocused.Should().Be(1, "the focused button went away, so the tab panel takes the focus");
     }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void The_editor_takes_the_focus_and_gives_it_back_when_it_closes(bool save)
+    {
+        SignInAs("ninja");
+        Serve();
+        Api.On(HttpMethod.Get, $"{GoalsPath}/2026", Goals(2026, ("book", 24, 12, 50)));
+        Api.On(HttpMethod.Put, "/api/v1/me/goals/2026", Goals(2026, ("book", 30, 12, 40)));
+        var page = OpenGoalsEditor();
+
+        // "Görevleri düzenle" is gone: the editor's heading, which names the year, takes the focus.
+        var heading = page.Find("form.goals-form h3");
+        heading.GetAttribute("tabindex").Should().Be("-1");
+        page.WaitForAssertion(() => FocusedReference(1).Should().Be(heading.GetAttribute("blazor:elementreference")));
+
+        if (save)
+        {
+            page.Find("#goal-book").Change("30");
+            page.Find("form.goals-form").Submit();
+            page.WaitForAssertion(() => page.Find(".alert--success"));
+        }
+        else
+        {
+            ButtonNamed(page, "Vazgeç").Click();
+        }
+
+        // Its buttons are gone too: back on "Görevleri düzenle", where the keyboard user started.
+        page.WaitForAssertion(() => FocusedReference(2).Should().Be(ButtonNamed(page, "Görevleri düzenle").GetAttribute("blazor:elementreference")));
+        page.FindAll("form.goals-form").Should().BeEmpty();
+    }
+
+    private string? FocusedReference(int calls) =>
+        JSInterop.VerifyFocusAsyncInvoke(calls)[^1].Arguments[0].Should().BeOfType<ElementReference>().Which.Id;
 
     [Fact]
     public void An_ended_session_on_save_signs_the_page_out_and_links_to_the_sign_in()
@@ -112,7 +156,15 @@ public sealed class ProfileGoalsTests : ProfileTestContext
         SignInAs("ninja");
         Serve();
         Api.On(HttpMethod.Get, $"{GoalsPath}/2026", Goals(2026));
-        var page = OpenGoalsEditor();
+        var page = Render<PublicProfile>(p => p.Add(x => x.Username, "ninja"));
+        page.WaitForAssertion(() => page.Find("a[href=settings]"));
+        ButtonNamed(page, "Görevler").Click();
+        // bUnit prints an element's reference only in the render that created it: note the year select's now.
+        var year = page.Find("#goals-year").GetAttribute("blazor:elementreference");
+        year.Should().NotBeNullOrEmpty();
+        page.WaitForAssertion(() => ButtonNamed(page, "Görevleri düzenle"));
+        ButtonNamed(page, "Görevleri düzenle").Click();
+        page.WaitForElement("form.goals-form");
 
         Api.OnProblem(HttpMethod.Get, "/api/v1/me", HttpStatusCode.Unauthorized, "unauthorized");
         Api.OnProblem(HttpMethod.Put, "/api/v1/me/goals/2026", HttpStatusCode.Unauthorized, "unauthorized");
@@ -125,5 +177,9 @@ public sealed class ProfileGoalsTests : ProfileTestContext
         page.WaitForAssertion(() => page.FindAll("a[href=settings]").Should().BeEmpty("the session is gone, and with it the owner's controls"));
         page.Find("#panel-Goals").TextContent.Should().Contain("Kendi görevlerini koymak için");
         QueriesTo("/api/v1/me").Should().HaveCountGreaterThan(1, "the session was asked again");
+
+        // No "Görevleri düzenle" to go back to any more: the year select, enabled again, takes the focus.
+        ButtonNamed(page, "Vazgeç").Click();
+        page.WaitForAssertion(() => FocusedReference(2).Should().Be(year));
     }
 }

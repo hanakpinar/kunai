@@ -1,8 +1,7 @@
 @using System.Globalization
-@using Microsoft.Kiota.Abstractions
 @inject KunaiApiClient Api
 
-<LoadProblem Problem="_problem" Busy="_loading" OnRetry="RetryAsync" />
+<LoadProblem Problem="_problem" Busy="_loading" OnRetry="RetryAsync" FocusAfterRetry="FocusPanel" />
 
 @if (_stats is null)
 {
@@ -100,6 +99,10 @@ else
     [Parameter, EditorRequired]
     public string Username { get; set; } = string.Empty;
 
+    /// <summary>Moves the focus to the tab panel around the stats, when "Tekrar dene" goes away.</summary>
+    [CascadingParameter(Name = ProfilePanel.FocusName)]
+    public Func<ValueTask>? FocusPanel { get; set; }
+
     // The selected year is always offered, also when nothing was completed in it.
     private IEnumerable<int> Years =>
         (_stats?.AvailableYears ?? []).OfType<int>().Append(_stats?.Year ?? DateTime.Now.Year).Distinct().OrderDescending();
@@ -129,7 +132,7 @@ else
             _stats = await Api.Api.V1.Users[Username].Stats.GetAsync(c => c.QueryParameters.Year = year);
             _selectedYear = _stats?.Year;
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
         {
             // The cards still show the previous year (if any): put the select back on it.
             _problem = ApiProblem.From(exception);

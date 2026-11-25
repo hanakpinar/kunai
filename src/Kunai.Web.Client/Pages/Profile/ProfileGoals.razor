@@ -1,24 +1,23 @@
 @using System.Globalization
-@using Microsoft.Kiota.Abstractions
 @inject KunaiApiClient Api
 
 <div class="toolbar">
     <label class="year">
         <span>Yıl</span>
-        <select id="goals-year" value="@_year" disabled="@(_loading || _editing)" @onchange="ChangeYearAsync">
+        <select id="goals-year" value="@_year" disabled="@(_loading || _editing)" @onchange="ChangeYearAsync" @ref="_yearSelect">
             @foreach (var year in Years)
             {
                 <option value="@year">@year</option>
             }
         </select>
     </label>
-    @if (IsOwner && !_editing && _goals is not null)
+    @if (CanEdit)
     {
-        <button type="button" class="button button--small" disabled="@_loading" @onclick="StartEditing">Görevleri düzenle</button>
+        <button type="button" class="button button--small" disabled="@_loading" @onclick="StartEditing" @ref="_editButton">Görevleri düzenle</button>
     }
 </div>
 
-<LoadProblem Problem="_problem" Busy="_loading" OnRetry="LoadAsync" />
+<LoadProblem Problem="_problem" Busy="_loading" OnRetry="LoadAsync" FocusAfterRetry="FocusPanel" />
 @if (_saved)
 {
     <p class="alert alert--success" role="status">Görevler kaydedildi. Hedefe kilitlen!</p>
@@ -26,7 +25,7 @@
 
 @if (_editing)
 {
-    <GoalsEditor Year="_year" Goals="_goals?.Goals" OnSaved="Saved" OnCancel="() => _editing = false" />
+    <GoalsEditor Year="_year" Goals="_goals?.Goals" OnSaved="Saved" OnCancel="StopEditing" />
 }
 else if (_goals is null)
 {
@@ -72,6 +71,11 @@ else
     private bool _editing;
     private bool _saved;
     private int _year;
+    private ElementReference _editButton;
+    private ElementReference _yearSelect;
+
+    // Set when the editor closes: its buttons had the focus, and they are gone.
+    private bool _focusAfterEditing;
 
     [Parameter, EditorRequired]
     public string Username { get; set; } = string.Empty;
@@ -85,6 +89,12 @@ else
 
     [Parameter]
     public bool IsSignedIn { get; set; }
+
+    /// <summary>Moves the focus to the tab panel around the goals, when "Tekrar dene" goes away.</summary>
+    [CascadingParameter(Name = ProfilePanel.FocusName)]
+    public Func<ValueTask>? FocusPanel { get; set; }
+
+    private bool CanEdit => IsOwner && !_editing && _goals is not null;
 
     // Next year too, so missions can be set before New Year's Eve.
     private IEnumerable<int> Years => Enumerable.Range(Year - 2, 4).Where(y => y is >= 2000 and <= 2100).OrderDescending();
@@ -115,8 +125,27 @@ else
     private void Saved(GoalsResponse goals)
     {
         _goals = goals;
-        _editing = false;
         _saved = true;
+        StopEditing();
+    }
+
+    private void StopEditing()
+    {
+        _editing = false;
+        _focusAfterEditing = true;
+    }
+
+    // Back on "Görevleri düzenle", which opened the editor. Moving the focus leaves the role=status text above to be
+    // read too. Without it (the session ended while editing), the year select, which is enabled again, takes it.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_focusAfterEditing)
+        {
+            return;
+        }
+
+        _focusAfterEditing = false;
+        await (CanEdit ? _editButton : _yearSelect).FocusAsync();
     }
 
     private async Task LoadAsync()
@@ -129,7 +158,7 @@ else
         {
             _goals = await Api.Api.V1.Users[Username].Goals[_year].GetAsync();
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
         {
             _problem = ApiProblem.From(exception);
         }

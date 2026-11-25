@@ -19,6 +19,16 @@ public abstract class ProfileTestContext : KunaiTestContext
 {
     protected const string ProfilePath = "/api/v1/users/ninja";
 
+    /// <summary>Plans the module that keeps the profile's tab keys from scrolling the page.</summary>
+    protected ProfileTestContext()
+    {
+        TabKeys = JSInterop.SetupModule(PublicProfile.ScriptPath);
+        TabKeys.SetupVoid("preventTabKeyScrolling", _ => true).SetVoidResult();
+    }
+
+    /// <summary>PublicProfile.razor.js, as the profile page imports it.</summary>
+    protected BunitJSModuleInterop TabKeys { get; }
+
     /// <summary>Serves ninja's profile, the first shelf page (with a next cursor) and the belts.</summary>
     protected void Serve()
     {

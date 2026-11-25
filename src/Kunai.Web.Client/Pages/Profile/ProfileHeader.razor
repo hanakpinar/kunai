@@ -2,7 +2,7 @@
     <UserAvatar Url="@Profile.AvatarUrl" Alt="@($"{Profile.DisplayName} adlı ninjanın avatarı")" Size="lg" />
 
     <div class="profile-header__name">
-        <h1>@Profile.DisplayName</h1>
+        <h1 tabindex="-1" @ref="_heading">@Profile.DisplayName</h1>
         <p class="handle muted">@($"@{Profile.Username}")</p>
         @if (!string.IsNullOrWhiteSpace(Profile.Bio))
         {
@@ -42,11 +42,16 @@
 </header>
 
 @code {
+    private ElementReference _heading;
+
     [Parameter, EditorRequired]
     public PublicProfileResponse Profile { get; set; } = default!;
 
     [Parameter]
     public bool IsOwner { get; set; }
+
+    /// <summary>Moves the focus to the profile's name, the page heading.</summary>
+    public ValueTask FocusHeadingAsync() => _heading.FocusAsync();
 
     private static int PointsLeft(RankResponse rank) => Math.Max(0, (rank.NextAt ?? 0) - (rank.Points ?? 0));
 }

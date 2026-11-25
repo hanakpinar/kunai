@@ -4,6 +4,8 @@ using Bunit;
 
 using Kunai.Web.Client.Pages.Profile;
 
+using Microsoft.AspNetCore.Components;
+
 namespace Kunai.Web.Client.Tests.Profile;
 
 public sealed class BeltGuideTests : ProfileTestContext
@@ -43,11 +45,16 @@ public sealed class BeltGuideTests : ProfileTestContext
         var page = Render<BeltGuide>();
 
         page.WaitForAssertion(() => page.Find(".alert--error").TextContent.Should().Contain("Biraz bekleyip tekrar dene"));
+        var heading = page.Find("#belt-guide-title");
+        heading.GetAttribute("tabindex").Should().Be("-1");
+        var headingReference = heading.GetAttribute("blazor:elementreference");
         Api.On(HttpMethod.Get, "/api/v1/ranks", new object[] { Belt("white", 0, "#f4f4f0") });
         ButtonNamed(page, "Tekrar dene").Click();
 
         page.WaitForAssertion(() => page.FindAll(".belts__item").Should().ContainSingle());
         page.FindAll(".alert--error").Should().BeEmpty();
+        // "Tekrar dene" had the focus and is gone: the section's heading takes it, not the top of the page.
+        JSInterop.VerifyFocusAsyncInvoke().Arguments[0].Should().BeOfType<ElementReference>().Which.Id.Should().Be(headingReference);
     }
 
     private static object Belt(string code, int minPoints, string color) =>

@@ -1,7 +1,7 @@
 @page "/u/{Username}"
-@implements IDisposable
-@using Microsoft.Kiota.Abstractions
+@implements IAsyncDisposable
 @inject KunaiApiClient Api
+@inject IJSRuntime JS
 
 <PageTitle>@PageTitleText</PageTitle>
 
@@ -12,10 +12,18 @@
         <a class="button" href="">Ana sayfaya dön</a>
     </EmptyState>
 }
-else if (_problem is not null)
+else if (_problem is not null || _retrying)
 {
-    <h1 class="visually-hidden">Profil</h1>
-    <LoadProblem Problem="_problem" Busy="_loading" OnRetry="LoadAsync" />
+    @* The heading stays while "Tekrar dene" loads the profile again, and takes the focus that the button had. *@
+    <h1 class="visually-hidden" tabindex="-1" @ref="_problemHeading">Profil</h1>
+    @if (_problem is not null)
+    {
+        <LoadProblem Problem="_problem" Busy="_loading" OnRetry="RetryAsync" />
+    }
+    else
+    {
+        <Spinner Label="Profil yükleniyor…" />
+    }
 }
 else if (_profile is null)
 {
@@ -24,7 +32,7 @@ else if (_profile is null)
 else
 {
     <div @key="_profile.Username">
-        <ProfileHeader Profile="_profile" IsOwner="_isOwner" />
+        <ProfileHeader Profile="_profile" IsOwner="_isOwner" @ref="_header" />
 
         <section class="section" aria-labelledby="profile-summary-title">
             <h2 id="profile-summary-title">Bitirilenler</h2>
@@ -71,7 +79,7 @@ else
         <section class="section" aria-labelledby="profile-tabs-title">
             <h2 id="profile-tabs-title" class="visually-hidden">Raf, istatistikler ve görevler</h2>
             @* The ARIA tabs pattern: only the selected tab is in the Tab order; arrows, Home and End move between the tabs. *@
-            <div class="tabs" role="tablist" aria-labelledby="profile-tabs-title" @onkeydown="MoveBetweenTabsAsync">
+            <div class="tabs" role="tablist" aria-labelledby="profile-tabs-title" @onkeydown="MoveBetweenTabsAsync" @ref="_tablist">
                 @for (var index = 0; index < Tabs.Length; index++)
                 {
                     var position = index;
@@ -84,24 +92,29 @@ else
             </div>
 
             @* Every panel is always there, so aria-controls always resolves. Its content mounts the first time its tab
-               is opened and then stays, so switching back keeps the loaded shelf, year and filters. *@
-            @foreach (var (tab, _) in Tabs)
+               is opened and then stays, so switching back keeps the loaded shelf, year and filters. A panel takes the
+               focus when a control inside it goes away (Tekrar dene), through the function cascaded to its content. *@
+            @for (var index = 0; index < Tabs.Length; index++)
             {
-                <div role="tabpanel" id="@PanelId(tab)" aria-labelledby="@TabId(tab)" hidden="@(_tab != tab)">
+                var position = index;
+                var tab = Tabs[position].Tab;
+                <div role="tabpanel" id="@PanelId(tab)" aria-labelledby="@TabId(tab)" hidden="@(_tab != tab)" tabindex="-1" @ref="_panels[position]">
                     @if (_opened.Contains(tab))
                     {
-                        @switch (tab)
-                        {
-                            case ProfileTab.Shelf:
-                                <ProfileShelf Username="@_profile.Username" />
-                                break;
-                            case ProfileTab.Stats:
-                                <ProfileStats Username="@_profile.Username" />
-                                break;
-                            default:
-                                <ProfileGoals Username="@_profile.Username" Year="_goalYear" IsOwner="_isOwner" IsSignedIn="_isSignedIn" />
-                                break;
-                        }
+                        <CascadingValue Name="@ProfilePanel.FocusName" Value="_focusPanel[position]" IsFixed="true">
+                            @switch (tab)
+                            {
+                                case ProfileTab.Shelf:
+                                    <ProfileShelf Username="@_profile.Username" />
+                                    break;
+                                case ProfileTab.Stats:
+                                    <ProfileStats Username="@_profile.Username" />
+                                    break;
+                                default:
+                                    <ProfileGoals Username="@_profile.Username" Year="_goalYear" IsOwner="_isOwner" IsSignedIn="_isSignedIn" />
+                                    break;
+                            }
+                        </CascadingValue>
                     }
                 </div>
             }
@@ -112,12 +125,22 @@ else
 }
 
 @code {
+    /// <summary>The module that keeps the tab keys from scrolling the page (see PreventTabKeyScrollingAsync).</summary>
+    internal const string ScriptPath = "./Pages/Profile/PublicProfile.razor.js";
+
     private static readonly (ProfileTab Tab, string Label)[] Tabs =
         [(ProfileTab.Shelf, "Raf"), (ProfileTab.Stats, "İstatistikler"), (ProfileTab.Goals, "Görevler")];
 
     private readonly HashSet<ProfileTab> _opened = [];
     private readonly ElementReference[] _tabButtons = new ElementReference[Tabs.Length];
+    private readonly ElementReference[] _panels = new ElementReference[Tabs.Length];
+    private readonly Func<ValueTask>[] _focusPanel;
     private CancellationTokenSource? _cancel;
+    private ElementReference _tablist;
+    private ElementReference _problemHeading;
+    private ProfileHeader? _header;
+    private Task<IJSObjectReference>? _tabKeys;
+    private string? _guardedTablist;
     private PublicProfileResponse? _profile;
     private List<TypeCounts> _completed = [];
     private int _thisYearTotal;
@@ -129,6 +152,14 @@ else
     private bool _isSignedIn;
     private string? _loadedFor;
     private ProfileTab _tab;
+
+    // A retry of a failed load runs: the heading above the problem stays (and keeps the focus) until it ends.
+    private bool _retrying;
+    private bool _focusProblemHeading;
+    private bool _focusProfileHeading;
+
+    public PublicProfile() =>
+        _focusPanel = [.. Enumerable.Range(0, Tabs.Length).Select(position => (Func<ValueTask>)(() => _panels[position].FocusAsync()))];
 
     [Parameter]
     public string Username { get; set; } = string.Empty;
@@ -149,6 +180,7 @@ else
 
         // The same page instance is reused when navigating from one profile to another: start over on the Raf tab.
         _loadedFor = Username;
+        _retrying = false;
         _opened.Clear();
         Select(ProfileTab.Shelf);
         await LoadAsync();
@@ -188,13 +220,13 @@ else
             _notFound = profile is null;
             ShowViewer(viewer);
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException or OperationCanceledException)
+        catch (Exception exception) when (token.IsCancellationRequested && (exception is OperationCanceledException || ApiProblem.IsApiFailure(exception)))
         {
-            if (token.IsCancellationRequested)
-            {
-                return;
-            }
-
+            // A newer load (another profile) cancelled this one, or this one failed after that: the newer one shows
+            // its own answer, and a stale problem here would hide it (a successful load never clears _problem).
+        }
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
+        {
             var problem = ApiProblem.From(exception);
             _notFound = problem.Status == 404;
             _problem = _notFound ? null : problem;
@@ -205,6 +237,62 @@ else
             {
                 _loading = false;
             }
+        }
+    }
+
+    // "Tekrar dene" goes away with the problem: the heading above it takes the focus while the profile loads, and the
+    // profile's own heading once it is there.
+    private async Task RetryAsync()
+    {
+        var username = Username;
+        _retrying = true;
+        _focusProblemHeading = true;
+        await LoadAsync();
+        if (!string.Equals(username, Username, StringComparison.Ordinal))
+        {
+            return; // Another profile was opened meanwhile; it starts over on its own.
+        }
+
+        _retrying = false;
+        _focusProfileHeading = _profile is not null;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusProblemHeading && _problemHeading.Id is not null)
+        {
+            _focusProblemHeading = false;
+            await _problemHeading.FocusAsync();
+        }
+
+        if (_focusProfileHeading && _header is not null && _profile is not null)
+        {
+            _focusProfileHeading = false;
+            await _header.FocusHeadingAsync();
+        }
+
+        await PreventTabKeyScrollingAsync();
+    }
+
+    // The tab keys select and focus a tab (MoveBetweenTabsAsync). Blazor cannot cancel the browser's own action for
+    // some keys only, so a listener in PublicProfile.razor.js does it: otherwise Home and End also scroll the page.
+    // Each new tab list (a new profile) gets it; the listener goes with the element.
+    private async Task PreventTabKeyScrollingAsync()
+    {
+        if (_profile is null || _tablist.Id is not { } id || string.Equals(id, _guardedTablist, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _guardedTablist = id;
+        try
+        {
+            _tabKeys ??= JS.InvokeAsync<IJSObjectReference>("import", ScriptPath).AsTask();
+            await (await _tabKeys).InvokeVoidAsync("preventTabKeyScrolling", _tablist);
+        }
+        catch (JSException)
+        {
+            // The script did not load: the keys still move between the tabs, only the page may scroll too.
         }
     }
 
@@ -232,9 +320,15 @@ else
         _opened.Add(tab);
     }
 
-    // Arrows wrap around; the newly selected tab takes the focus (selection follows focus).
+    // Arrows wrap around; the newly selected tab takes the focus (selection follows focus). A key with a modifier is
+    // the browser's (Alt+ArrowLeft goes back), here and in PublicProfile.razor.js.
     private async Task MoveBetweenTabsAsync(KeyboardEventArgs args)
     {
+        if (args.AltKey || args.CtrlKey || args.MetaKey || args.ShiftKey)
+        {
+            return;
+        }
+
         var current = Array.FindIndex(Tabs, t => t.Tab == _tab);
         var next = args.Key switch
         {
@@ -257,10 +351,21 @@ else
 
     private static string PanelId(ProfileTab tab) => $"panel-{tab}";
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         _cancel?.Cancel();
         _cancel?.Dispose();
+        if (_tabKeys is not null)
+        {
+            try
+            {
+                await (await _tabKeys).DisposeAsync();
+            }
+            catch (JSException)
+            {
+                // It never loaded; nothing to release.
+            }
+        }
     }
 
     private enum ProfileTab

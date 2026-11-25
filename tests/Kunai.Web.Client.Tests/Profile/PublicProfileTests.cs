@@ -71,12 +71,104 @@ public sealed class PublicProfileTests : ProfileTestContext
         var renders = page.RenderCount;
         gate.Release(ProfilePath);
 
-        // Ninja's answer arrives last; the page renders once more when that load ends, and must ignore it.
+        // Ninja's answer arrives last (HttpClient turns it into a cancellation, since the token was cancelled); the page
+        // renders once more when that load ends, and must ignore it.
         page.WaitForAssertion(() => QueriesTo(ProfilePath).Should().ContainSingle());
         page.WaitForState(() => page.RenderCount > renders);
         page.Find("h1").TextContent.Should().Be("Başka Ninja");
         page.Find(".profile-header").TextContent.Should().Contain("@other");
         page.Find("#panel-Shelf .item-card").TextContent.Should().Contain("Hyperion");
+        page.FindAll(".alert--error").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_cancelled_load_for_the_previous_profile_never_hides_the_new_one()
+    {
+        var gate = UseRequestGate();
+        Serve();
+        ServeProfile("other", "Başka Ninja");
+        Api.On(HttpMethod.Get, "/api/v1/users/other/shelf", ShelfPage("Hyperion", nextCursor: null));
+        // The browser aborts the fetch: ninja's request ends with a cancellation instead of a late answer.
+        gate.Hold(ProfilePath, honourCancellation: true);
+        var page = Render<PublicProfile>(p => p.Add(x => x.Username, "ninja"));
+        page.WaitForElement(".spinner");
+        var renders = page.RenderCount;
+
+        page.Render(p => p.Add(x => x.Username, "other"));
+
+        // Three renders: the new parameters, the end of the cancelled load and the end of the new one.
+        page.WaitForState(() => page.RenderCount >= renders + 3);
+        page.WaitForAssertion(() => page.Find("h1").TextContent.Should().Be("Başka Ninja"));
+        page.FindAll(".alert--error").Should().BeEmpty("the cancelled load is not a network error");
+        page.Find(".profile-header").TextContent.Should().Contain("@other");
+        QueriesTo(ProfilePath).Should().BeEmpty("ninja's request never left");
+    }
+
+    [Fact]
+    public void A_profile_that_answered_before_the_switch_never_replaces_the_new_page()
+    {
+        var gate = UseRequestGate();
+        Serve();
+        // The session is still loading: ninja's profile has answered, and its load waits for the viewer.
+        gate.Hold("/api/v1/me");
+        var page = Render<PublicProfile>(p => p.Add(x => x.Username, "ninja"));
+        page.WaitForAssertion(() => QueriesTo(ProfilePath).Should().ContainSingle());
+
+        // A profile that does not exist answers at once, while ninja's load is still waiting.
+        page.Render(p => p.Add(x => x.Username, "ghost"));
+        page.WaitForAssertion(() => page.Find(".empty-state").TextContent.Should().Contain("Bu kullanıcı yok"));
+        var renders = page.RenderCount;
+        gate.Release("/api/v1/me");
+
+        // Ninja's load ends now, with a profile in hand: it must not show it on ghost's page.
+        page.WaitForState(() => page.RenderCount > renders);
+        page.Find(".empty-state").TextContent.Should().Contain("Bu kullanıcı yok");
+        page.FindAll(".profile-header").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Retry_keeps_the_focus_on_the_page_heading()
+    {
+        Api.AnswerAsynchronously = true;
+        Api.OnProblem(HttpMethod.Get, ProfilePath, HttpStatusCode.ServiceUnavailable, "service_unavailable");
+        var page = Render<PublicProfile>(p => p.Add(x => x.Username, "ninja"));
+        page.WaitForAssertion(() => page.Find(".alert--error"));
+        var heading = page.Find("h1").GetAttribute("blazor:elementreference");
+        Serve();
+
+        ButtonNamed(page, "Tekrar dene").Click();
+
+        // "Tekrar dene" goes away with the problem: the heading above it, which stays while loading, takes its focus,
+        // and then the profile's own heading once it is there.
+        page.WaitForAssertion(() => page.Find("h1").TextContent.Should().Be("Kara Ninja"));
+        var profileHeading = page.Find("h1").GetAttribute("blazor:elementreference");
+        profileHeading.Should().NotBeNullOrEmpty();
+        page.WaitForAssertion(() => JSInterop.VerifyFocusAsyncInvoke(2).Select(i => i.Arguments[0]).OfType<ElementReference>().Select(r => r.Id)
+            .Should().Equal(heading, profileHeading));
+    }
+
+    [Fact]
+    public void Tab_keys_do_not_scroll_the_page()
+    {
+        Serve();
+        ServeProfile("other", "Başka Ninja");
+        Api.On(HttpMethod.Get, "/api/v1/users/other/shelf", ShelfPage("Hyperion", nextCursor: null));
+        var page = Render<PublicProfile>(p => p.Add(x => x.Username, "ninja"));
+        page.WaitForElement("[role=tablist]");
+        var tablist = page.Find("[role=tablist]").GetAttribute("blazor:elementreference");
+
+        // Home and End would also scroll the page; the module cancels that for the tab keys alone (bUnit has no
+        // default actions, so this checks that the tab list is handed to it).
+        page.WaitForAssertion(() => GuardedTablist(1).Should().Be(tablist));
+
+        page.Render(p => p.Add(x => x.Username, "other"));
+        page.WaitForAssertion(() => page.Find("h1").TextContent.Should().Be("Başka Ninja"));
+        var otherTablist = page.Find("[role=tablist]").GetAttribute("blazor:elementreference");
+        otherTablist.Should().NotBe(tablist, "a new profile renders a new tab list");
+        page.WaitForAssertion(() => GuardedTablist(2).Should().Be(otherTablist, "the new tab list gets the listener too"));
+
+        string? GuardedTablist(int calls) =>
+            TabKeys.VerifyInvoke("preventTabKeyScrolling", calls)[^1].Arguments[0].Should().BeOfType<ElementReference>().Which.Id;
     }
 
     [Fact]
@@ -181,4 +273,24 @@ public sealed class PublicProfileTests : ProfileTestContext
             JSInterop.VerifyFocusAsyncInvoke(calls)[^1].Arguments[0].Should().BeOfType<ElementReference>()
                 .Which.Id.Should().Be(references[id], $"focus moves to {id}");
     }
+
+    [Fact]
+    public void A_tab_key_with_a_modifier_is_left_to_the_browser()
+    {
+        Serve();
+        var page = Render<PublicProfile>(p => p.Add(x => x.Username, "ninja"));
+        page.WaitForElement("[role=tablist]");
+
+        // Alt+ArrowLeft goes back, Ctrl+End scrolls to the bottom: the browser's, like PublicProfile.razor.js leaves them.
+        page.Find("[role=tablist]").KeyDown(new KeyboardEventArgs { Key = "ArrowLeft", AltKey = true });
+        page.Find("[role=tablist]").KeyDown(new KeyboardEventArgs { Key = "End", CtrlKey = true });
+        page.Find("[role=tablist]").KeyDown(new KeyboardEventArgs { Key = "Home", MetaKey = true });
+        page.Find("[role=tablist]").KeyDown(new KeyboardEventArgs { Key = "ArrowRight", ShiftKey = true });
+
+        page.Find("#tab-Shelf").GetAttribute("aria-selected").Should().Be("true");
+        JSInterop.Invocations.Select(i => i.Identifier).Should().NotContain(i => i.Contains("focus", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private string? FocusedReference(int calls) =>
+        JSInterop.VerifyFocusAsyncInvoke(calls)[^1].Arguments[0].Should().BeOfType<ElementReference>().Which.Id;
 }

@@ -1,12 +1,11 @@
-@using Microsoft.Kiota.Abstractions
 @inject KunaiApiClient Api
 @inject CatalogMetadata Catalog
 
 <section class="section belt-guide" aria-labelledby="belt-guide-title">
-    <h2 id="belt-guide-title">Kuşaklar</h2>
+    <h2 id="belt-guide-title" tabindex="-1" @ref="_heading">Kuşaklar</h2>
     <p class="muted">Bitirdiğin her içerik puan kazandırır. Puanın biriktikçe kuşağın yükselir: beyazdan siyaha.</p>
 
-    <LoadProblem Problem="_problem" Busy="_loading" OnRetry="LoadAsync" />
+    <LoadProblem Problem="_problem" Busy="_loading" OnRetry="LoadAsync" FocusAfterRetry="() => _heading.FocusAsync()" />
 
     @if (_belts is null)
     {
@@ -52,6 +51,7 @@
     private List<(ItemType? Type, int Points)> _points = [];
     private ApiProblem? _problem;
     private bool _loading;
+    private ElementReference _heading;
 
     /// <summary>The viewed user's belt, highlighted in the list.</summary>
     [Parameter]
@@ -72,7 +72,7 @@
             _belts = [.. (await belts ?? []).OrderBy(b => b.MinPoints)];
             _points = [.. (await types)?.Types?.Where(t => t.RankPoints is > 0).Select(t => (t.Type, t.RankPoints ?? 0)) ?? []];
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
         {
             _problem = ApiProblem.From(exception);
         }

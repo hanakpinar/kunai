@@ -5,12 +5,15 @@
         <ProblemAlert Problem="Problem" />
         @if (Problem.IsRetryable)
         {
-            <button type="button" class="button button--ghost" disabled="@Busy" @onclick="OnRetry">Tekrar dene</button>
+            <button type="button" class="button button--ghost" disabled="@Busy" @onclick="RetryAsync">Tekrar dene</button>
         }
     </div>
 }
 
 @code {
+    // Set by a click on "Tekrar dene", until the next render shows whether the button is still there.
+    private bool _retried;
+
     [Parameter]
     public ApiProblem? Problem { get; set; }
 
@@ -21,4 +24,32 @@
     /// <summary>True while a load runs, so the retry cannot be sent twice.</summary>
     [Parameter]
     public bool Busy { get; set; }
+
+    /// <summary>
+    /// Moves the focus to the section around the problem (its panel or heading). Called when "Tekrar dene", which had
+    /// the focus, goes away with the problem; otherwise the browser drops the focus to the top of the page.
+    /// </summary>
+    [Parameter]
+    public Func<ValueTask>? FocusAfterRetry { get; set; }
+
+    private Task RetryAsync()
+    {
+        _retried = true;
+        return OnRetry.InvokeAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_retried)
+        {
+            return;
+        }
+
+        // Answered at once with the same failure, the button stays (and keeps the focus).
+        _retried = false;
+        if (Problem?.IsRetryable != true && FocusAfterRetry is not null)
+        {
+            await FocusAfterRetry();
+        }
+    }
 }

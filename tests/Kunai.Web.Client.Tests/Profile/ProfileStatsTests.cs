@@ -66,16 +66,26 @@ public sealed class ProfileStatsTests : ProfileTestContext
     {
         Api.AnswerAsynchronously = true;
         Api.OnProblem(HttpMethod.Get, StatsPath, HttpStatusCode.InternalServerError, "internal_error");
-        var page = Render<ProfileStats>(p => p.Add(x => x.Username, "ninja"));
+        var panelFocused = 0;
+        var page = Render<ProfileStats>(p => p
+            .Add(x => x.Username, "ninja")
+            .AddCascadingValue(ProfilePanel.FocusName, (Func<ValueTask>)(() =>
+            {
+                panelFocused++;
+                return ValueTask.CompletedTask;
+            })));
 
         page.WaitForAssertion(() => page.Find(".alert--error").TextContent.Should().Contain("Sunucuda bir hata oluştu"));
         page.FindAll("#stats-year").Should().BeEmpty("there is no year on screen yet");
         Api.On(HttpMethod.Get, StatsPath, Stats(2026, 12, 2026));
         ButtonNamed(page, "Tekrar dene").Click();
 
+        // The button had the focus and goes away with the problem: the tab panel around the stats takes it.
+        page.WaitForAssertion(() => panelFocused.Should().Be(1));
         page.WaitForAssertion(() => page.FindAll(".month-bars__bar").Should().HaveCount(12));
         SelectedYear(page).Should().Be("2026");
         QueriesTo(StatsPath).Should().Equal(StatsPath, StatsPath);
+        panelFocused.Should().Be(1, "only the retry moves the focus");
     }
 
     [Fact]

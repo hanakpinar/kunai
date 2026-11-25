@@ -4,6 +4,8 @@ using Bunit;
 
 using Kunai.Web.Client.Pages.Profile;
 
+using Microsoft.AspNetCore.Components;
+
 namespace Kunai.Web.Client.Tests.Profile;
 
 public sealed class ProfileShelfTests : ProfileTestContext
@@ -80,8 +82,54 @@ public sealed class ProfileShelfTests : ProfileTestContext
         Api.OnProblem(HttpMethod.Get, ShelfPath, HttpStatusCode.BadRequest, "invalid_cursor");
         ButtonNamed(page, "Daha fazla").Click();
 
-        page.WaitForAssertion(() => page.Find("#panel-Shelf .alert--error").TextContent.Should().Contain("Liste değişti"));
+        page.WaitForAssertion(() => page.Find("#panel-Shelf .more .alert--error").TextContent.Should().Contain("Liste değişti"));
         HasButton(page, "Tekrar dene").Should().BeFalse("the same request would be refused again");
+        HasButton(page, "Daha fazla").Should().BeFalse("it would send that request again");
         page.FindAll("#panel-Shelf .item-card").Should().ContainSingle("the loaded page stays");
+    }
+
+    [Fact]
+    public void A_failed_next_page_shows_its_problem_by_the_button_that_asked_for_it()
+    {
+        Serve();
+        var page = Render<PublicProfile>(p => p.Add(x => x.Username, "ninja"));
+        page.WaitForAssertion(() => page.Find("#panel-Shelf .item-card").TextContent.Should().Contain("Dune"));
+
+        Api.OnProblem(HttpMethod.Get, ShelfPath, HttpStatusCode.ServiceUnavailable, "service_unavailable");
+        ButtonNamed(page, "Daha fazla").Click();
+
+        // At the bottom of a long shelf, where the user clicked; "Daha fazla" there is the one retry.
+        page.WaitForAssertion(() => page.Find("#panel-Shelf .more .alert--error").TextContent.Should().Contain("Sunucuda bir hata oluştu"));
+        page.FindAll("#panel-Shelf .load-problem").Should().BeEmpty("nothing is shown above the shelf");
+        HasButton(page, "Tekrar dene").Should().BeFalse();
+        page.Find("#panel-Shelf .more .alert--error").NextElementSibling!.TextContent.Trim().Should().Be("Daha fazla");
+
+        Api.On(HttpMethod.Get, ShelfPath, ShelfPage("Hyperion", nextCursor: null));
+        ButtonNamed(page, "Daha fazla").Click();
+
+        page.WaitForAssertion(() => page.FindAll("#panel-Shelf .item-card").Should().HaveCount(2));
+        page.FindAll("#panel-Shelf .alert--error").Should().BeEmpty();
+        QueriesTo(ShelfPath).Skip(1).Should().HaveCount(2).And.AllSatisfy(q => q.Should().ContainEquivalentOf("cursor=next-page"));
+    }
+
+    [Fact]
+    public void Retrying_the_first_page_moves_the_focus_to_the_shelf_panel()
+    {
+        Api.AnswerAsynchronously = true;
+        Serve();
+        Api.OnProblem(HttpMethod.Get, ShelfPath, HttpStatusCode.ServiceUnavailable, "service_unavailable");
+        var page = Render<PublicProfile>(p => p.Add(x => x.Username, "ninja"));
+        page.WaitForElement("#panel-Shelf");
+        var panel = page.Find("#panel-Shelf").GetAttribute("blazor:elementreference");
+        page.Find("#panel-Shelf").GetAttribute("tabindex").Should().Be("-1");
+        page.WaitForAssertion(() => page.Find("#panel-Shelf .alert--error"));
+
+        Api.On(HttpMethod.Get, ShelfPath, ShelfPage("Dune", nextCursor: null));
+        ButtonNamed(page, "Tekrar dene").Click();
+
+        // "Tekrar dene", which had the focus, goes away with the problem: the panel takes it, not the top of the page.
+        page.WaitForAssertion(() => JSInterop.VerifyFocusAsyncInvoke().Arguments[0].Should().BeOfType<ElementReference>()
+            .Which.Id.Should().Be(panel));
+        page.WaitForAssertion(() => page.FindAll("#panel-Shelf .item-card").Should().ContainSingle());
     }
 }
