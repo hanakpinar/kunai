@@ -81,7 +81,7 @@
             });
             _done = true;
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
         {
             _problem = ApiProblem.From(exception);
         }

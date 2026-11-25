@@ -55,6 +55,28 @@ public sealed class AuthSession(KunaiApiClient api) : AuthenticationStateProvide
         NotifyAuthenticationStateChanged(_state);
     }
 
+    /// <summary>
+    /// A 401 on a signed-in call means the session cookie has expired. Reloading the session turns the UI to its
+    /// signed-out state: the router sends an [Authorize] page to sign in, a public page shows its sign-in links.
+    /// </summary>
+    public async Task RefreshIfExpiredAsync(ApiProblem problem)
+    {
+        ArgumentNullException.ThrowIfNull(problem);
+        if (problem.Status != 401)
+        {
+            return;
+        }
+
+        try
+        {
+            await RefreshAsync();
+        }
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
+        {
+            // GET /me could not answer either; the alert already asks to sign in again.
+        }
+    }
+
     private async Task<AuthenticationState> LoadAsync()
     {
         try
@@ -65,7 +87,7 @@ public sealed class AuthSession(KunaiApiClient api) : AuthenticationStateProvide
         {
             Me = null;
         }
-        catch (HttpRequestException)
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
         {
             // The API is unreachable: keep whoever was signed in (anonymous on a cold start) instead of failing the router.
         }

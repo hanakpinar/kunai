@@ -17,6 +17,13 @@ public sealed record ApiProblem(string Code, string Message, IReadOnlyDictionary
     /// </summary>
     public bool IsRetryable => Status is 0 or 429 or >= 500 && !string.Equals(Code, "provider_not_configured", StringComparison.Ordinal);
 
+    /// <summary>
+    /// The failures an API call can end with and the UI shows as a problem: an API error, no connection, or an
+    /// HttpClient timeout. Pages that cancel their own requests catch OperationCanceledException first.
+    /// </summary>
+    public static bool IsApiFailure(Exception exception) =>
+        exception is ApiException or HttpRequestException or TaskCanceledException;
+
     public static ApiProblem From(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);

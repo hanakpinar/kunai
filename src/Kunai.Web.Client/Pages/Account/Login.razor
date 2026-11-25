@@ -61,7 +61,7 @@
             await Session.LoginAsync(_form.Login.Trim(), _form.Password);
             Navigation.NavigateTo(SafeReturnUrl());
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
         {
             _problem = ApiProblem.From(exception);
         }

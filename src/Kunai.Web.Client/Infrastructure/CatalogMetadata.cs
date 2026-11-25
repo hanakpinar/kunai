@@ -36,6 +36,17 @@ public sealed class CatalogMetadata(KunaiApiClient api)
     public async Task<string> StatusLabelAsync(ItemType? type, ShelfStatus? status) =>
         (await ForAsync(type))?.Statuses?.FirstOrDefault(s => s.Status == status)?.Label?.Tr ?? status?.ToString() ?? string.Empty;
 
+    /// <summary>A label that fits every type, for when the registry cannot be loaded.</summary>
+    public static string GenericStatusLabel(ShelfStatus? status) => status switch
+    {
+        ShelfStatus.Planned => "Planlanan",
+        ShelfStatus.InProgress => "Devam eden",
+        ShelfStatus.Completed => "Tamamlanan",
+        ShelfStatus.Paused => "Ara verilen",
+        ShelfStatus.Dropped => "Bırakılan",
+        _ => string.Empty,
+    };
+
     public static string TypeName(ItemType? type) => type switch
     {
         ItemType.Book => "Kitap",

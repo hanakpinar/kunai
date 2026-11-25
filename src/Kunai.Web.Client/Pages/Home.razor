@@ -97,7 +97,7 @@
             _inProgress = (await inProgress)?.Items ?? [];
             _recent = (await recent)?.Items ?? [];
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
         {
             _inProgress = [];
             _recent = [];

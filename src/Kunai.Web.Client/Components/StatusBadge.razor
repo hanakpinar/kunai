@@ -13,5 +13,16 @@
 
     private string CssStatus => Status?.ToString().ToLowerInvariant() ?? "unknown";
 
-    protected override async Task OnParametersSetAsync() => _label = await Catalog.StatusLabelAsync(Type, Status);
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            _label = await Catalog.StatusLabelAsync(Type, Status);
+        }
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
+        {
+            // The registry did not load: a badge never breaks the page, it falls back to a neutral label.
+            _label = CatalogMetadata.GenericStatusLabel(Status);
+        }
+    }
 }

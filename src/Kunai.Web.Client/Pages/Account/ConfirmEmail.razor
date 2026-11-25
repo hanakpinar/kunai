@@ -45,7 +45,7 @@
             await Api.Api.V1.Auth.ConfirmEmail.PostAsync(new ConfirmEmailRequest { UserId = UserId, Token = Token });
             _confirmed = true;
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
         {
             _confirmed = false;
         }

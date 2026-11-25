@@ -1,6 +1,7 @@
 @using Microsoft.Kiota.Abstractions
 @inject KunaiApiClient Api
 @inject CatalogMetadata Catalog
+@inject AuthSession Session
 
 <div class="dialog-backdrop" @onclick="CancelAsync"></div>
 <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="entry-editor-title">
@@ -9,7 +10,18 @@
         <button type="button" class="icon-button" aria-label="Kapat" @onclick="CancelAsync">✕</button>
     </header>
 
-    @if (_definition is null)
+    @if (_definition is null && _loadProblem is not null)
+    {
+        <ProblemAlert Problem="_loadProblem" />
+        <div class="dialog__footer">
+            <button type="button" class="button button--ghost" @onclick="CancelAsync">Kapat</button>
+            @if (_loadProblem.IsRetryable)
+            {
+                <button type="button" class="button" @onclick="LoadDefinitionAsync">Tekrar dene</button>
+            }
+        </div>
+    }
+    else if (_definition is null)
     {
         <Spinner />
     }
@@ -88,6 +100,7 @@
     private readonly EntryForm _form = new();
     private ItemTypeDefinition? _definition;
     private ApiProblem? _problem;
+    private ApiProblem? _loadProblem;
     private bool _busy;
 
     [Parameter, EditorRequired]
@@ -117,9 +130,21 @@
 
     private int? MaxProgress => _definition?.ProgressUnit == ProgressUnit.Percent ? 100 : ProgressTotal;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync() => LoadDefinitionAsync();
+
+    private async Task LoadDefinitionAsync()
     {
-        _definition = await Catalog.ForAsync(ItemType);
+        _loadProblem = null;
+        try
+        {
+            _definition = await Catalog.ForAsync(ItemType);
+        }
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
+        {
+            _loadProblem = ApiProblem.From(exception);
+            return;
+        }
+
         if (Existing is not null)
         {
             _form.Status = Existing.Status;
@@ -169,9 +194,10 @@
             });
             await OnSaved.InvokeAsync(saved);
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
         {
             _problem = ApiProblem.From(exception);
+            await Session.RefreshIfExpiredAsync(_problem);
         }
         finally
         {
@@ -187,9 +213,10 @@
             await Api.Api.V1.Me.Shelf[ItemId].DeleteAsync();
             await OnRemoved.InvokeAsync();
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
         {
             _problem = ApiProblem.From(exception);
+            await Session.RefreshIfExpiredAsync(_problem);
         }
         finally
         {
