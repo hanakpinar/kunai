@@ -1,8 +1,6 @@
 using Kunai.Web.Client.Api.Models;
 using Kunai.Web.Client.Infrastructure;
 
-using Microsoft.Kiota.Abstractions;
-
 namespace Kunai.Web.Client.Pages.Shelf;
 
 /// <summary>
@@ -13,11 +11,8 @@ public static class ShelfStatusOptions
 {
     public static IReadOnlyList<StatusOption> Generic { get; } =
     [
-        new(ShelfStatus.Planned, "Planlanan"),
-        new(ShelfStatus.InProgress, "Devam eden"),
-        new(ShelfStatus.Completed, "Tamamlanan"),
-        new(ShelfStatus.Paused, "Ara verilen"),
-        new(ShelfStatus.Dropped, "Bırakılan"),
+        .. new[] { ShelfStatus.Planned, ShelfStatus.InProgress, ShelfStatus.Completed, ShelfStatus.Paused, ShelfStatus.Dropped }
+            .Select(status => new StatusOption(status, CatalogMetadata.GenericStatusLabel(status))),
     ];
 
     public static async Task<IReadOnlyList<StatusOption>> ForAsync(CatalogMetadata catalog, ItemType? type)
@@ -40,7 +35,7 @@ public static class ShelfStatusOptions
                 return options;
             }
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException or OperationCanceledException)
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
         {
             // Without the catalog (unreachable, failing or timed out) the neutral labels still let the user filter.
         }

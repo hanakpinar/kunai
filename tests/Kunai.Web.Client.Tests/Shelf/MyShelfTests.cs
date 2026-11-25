@@ -17,6 +17,7 @@ namespace Kunai.Web.Client.Tests.Shelf;
 public sealed class MyShelfTests : KunaiTestContext
 {
     private const string ShelfPath = "/api/v1/me/shelf";
+    private const string ItemTypesPath = "/api/v1/item-types";
     private static readonly Guid DuneId = Guid.Parse("0b6f5a9e-2a43-4d6c-9a43-6a2f0b1c7d01");
     private static readonly Guid HadesId = Guid.Parse("5c1e7f20-8d3b-4b0e-b7a5-2f9c4e6d8a02");
 
@@ -93,7 +94,7 @@ public sealed class MyShelfTests : KunaiTestContext
     public async Task A_deep_link_shows_its_filter_while_the_type_statuses_load()
     {
         var network = UseSlowNetwork();
-        var catalog = network.HoldNext(HttpMethod.Get, "/api/v1/item-types");
+        var catalog = network.HoldNext(HttpMethod.Get, ItemTypesPath);
         Api.On(HttpMethod.Get, ShelfPath, Page(null, 1, Dune()));
         var navigation = Services.GetRequiredService<NavigationManager>();
         navigation.NavigateTo("shelf?type=book&status=inProgress");
@@ -176,10 +177,121 @@ public sealed class MyShelfTests : KunaiTestContext
 
         page.WaitForAssertion(() => Titles(page).Should().Equal("Hades"));
         first.WasCancelled.Should().BeTrue("the newer filter cancels the load it replaces");
+
+        // The stale answer still arrives in full; the first visit's lifecycle re-renders once it has handled it.
+        var renders = page.RenderCount;
         first.Release();
-        await ArrivedAsync(first.Delivered);
+        page.WaitForState(() => page.RenderCount > renders);
+        Titles(page).Should().Equal("Hades");
+        page.Find(".shelf-header__count").TextContent.Should().Be("1 içerik");
+    }
+
+    [Fact]
+    public async Task An_answer_read_just_before_a_newer_filter_starts_is_dropped()
+    {
+        var network = UseSlowNetwork();
+        Api.On(HttpMethod.Get, ShelfPath, Page(null, 1, Dune()));
+        var first = network.HoldNext(HttpMethod.Get, ShelfPath);
+        var page = Render<MyShelf>();
+        await ArrivedAsync(first.Waiting);
+        Api.On(HttpMethod.Get, ShelfPath, Page(null, 1, Hades()));
+
+        await DeliverAsTheNextFilterStartsAsync(page, first, "Tamamlanan");
+
         page.WaitForAssertion(() => Titles(page).Should().Equal("Hades"));
         page.Find(".shelf-header__count").TextContent.Should().Be("1 içerik");
+    }
+
+    [Fact]
+    public async Task An_error_read_just_before_a_newer_filter_starts_is_not_shown()
+    {
+        var network = UseSlowNetwork();
+        Api.OnProblem(HttpMethod.Get, ShelfPath, HttpStatusCode.InternalServerError, "internal_error");
+        var first = network.HoldNext(HttpMethod.Get, ShelfPath);
+        var page = Render<MyShelf>();
+        await ArrivedAsync(first.Waiting);
+        Api.On(HttpMethod.Get, ShelfPath, Page(null, 1, Hades()));
+
+        await DeliverAsTheNextFilterStartsAsync(page, first, "Tamamlanan");
+
+        page.WaitForAssertion(() => Titles(page).Should().Equal("Hades"));
+        page.FindAll(".alert--error").Should().BeEmpty("the error belongs to a list that is no longer shown");
+    }
+
+    [Fact]
+    public async Task Filters_changed_in_quick_succession_each_cancel_the_load_before()
+    {
+        var network = UseSlowNetwork();
+        Api.On(HttpMethod.Get, ShelfPath, Page(null, 1, Dune()));
+        var first = network.HoldNext(HttpMethod.Get, ShelfPath);
+        first.SlowDownCancellation();
+        var navigation = Services.GetRequiredService<NavigationManager>();
+        var page = Render<MyShelf>();
+        await ArrivedAsync(first.Waiting);
+        // The two filter loads in arrival order (a load that waited on its cancellation sends its request late).
+        var second = network.HoldNext(HttpMethod.Get, ShelfPath, "Status=");
+        var third = network.HoldNext(HttpMethod.Get, ShelfPath, "Status=");
+        var last = network.HoldNext(HttpMethod.Get, ShelfPath, "Status=completed");
+
+        // The next filter arrives while the first load's cancellation is still on its way.
+        navigation.NavigateTo("shelf?status=planned");
+        navigation.NavigateTo("shelf?status=inProgress");
+        first.OpenCancellation();
+        await ArrivedAsync(second.Waiting);
+        await ArrivedAsync(third.Waiting);
+        Api.On(HttpMethod.Get, ShelfPath, Page(null, 1, Hades()));
+        navigation.NavigateTo("shelf?status=completed");
+        await ArrivedAsync(last.Waiting);
+
+        first.WasCancelled.Should().BeTrue();
+        second.WasCancelled.Should().BeTrue("a load is never left running uncancelled behind a newer one");
+        third.WasCancelled.Should().BeTrue("a load is never left running uncancelled behind a newer one");
+        last.WasCancelled.Should().BeFalse();
+        first.Release();
+        second.Release();
+        third.Release();
+        last.Release();
+        page.WaitForAssertion(() => Titles(page).Should().Equal("Hades"));
+        page.Find(".shelf-header__count").TextContent.Should().Be("1 içerik");
+    }
+
+    [Fact]
+    public void A_type_tab_still_works_when_the_item_types_time_out()
+    {
+        var network = UseSlowNetwork();
+        network.Fail(HttpMethod.Get, ItemTypesPath, new TaskCanceledException("HttpClient.Timeout elapsed.", new TimeoutException()));
+        Api.On(HttpMethod.Get, ShelfPath, Page(null, 1, Dune()));
+        Services.GetRequiredService<NavigationManager>().NavigateTo("shelf?type=book");
+
+        var page = Render<MyShelf>();
+
+        // Neutral chips, the bare progress number and a neutral badge instead of a broken page.
+        page.WaitForAssertion(() => Titles(page).Should().Equal("Dune"));
+        ShelfRequests().Should().ContainSingle().Which.Should().Contain("Type=book");
+        page.Find(".tabs button[aria-pressed=true]").TextContent.Should().Be("Kitap");
+        page.FindAll(".chips button").Select(b => b.TextContent).Should().Equal("Planlanan", "Devam eden", "Tamamlanan", "Ara verilen", "Bırakılan");
+        page.WaitForAssertion(() => page.Find(".shelf-card__progress").TextContent.Should().EndWith("İlerleme: 120 / 412"));
+        page.WaitForAssertion(() => page.Find(".status-badge").TextContent.Should().Be("Devam eden"));
+        page.FindAll(".alert--error").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void The_editor_offers_a_retry_when_the_item_types_time_out_and_the_shelf_stays_usable()
+    {
+        var network = UseSlowNetwork();
+        network.Fail(HttpMethod.Get, ItemTypesPath, new TaskCanceledException("HttpClient.Timeout elapsed.", new TimeoutException()));
+        Api.On(HttpMethod.Get, ShelfPath, Page(null, 2, Dune(), Hades()));
+        var page = Render<MyShelf>();
+        page.WaitForAssertion(() => page.FindAll(".status-badge").Select(b => b.TextContent).Should().Equal("Devam eden", "Tamamlanan"));
+
+        page.FindAll(".shelf-card__edit")[0].Click();
+
+        page.WaitForAssertion(() => page.Find(".dialog .alert--error").TextContent.Should().Contain("Sunucuya ulaşılamadı"));
+        network.Recover(HttpMethod.Get, ItemTypesPath);
+        page.FindAll(".dialog button").Single(b => HasText(b, "Tekrar dene")).Click();
+        page.WaitForAssertion(() => page.Find(".dialog select").TextContent.Should().Contain("Okuyorum"));
+        page.FindAll(".dialog .alert--error").Should().BeEmpty();
+        Titles(page).Should().Equal("Dune", "Hades");
     }
 
     [Fact]
@@ -353,6 +465,18 @@ public sealed class MyShelfTests : KunaiTestContext
 
     // A held answer renders nothing for WaitForAssertion to wake up on, so wait for the network itself.
     private static Task ArrivedAsync(Task step) => step.WaitAsync(TimeSpan.FromSeconds(5), Xunit.TestContext.Current.CancellationToken);
+
+    // Lets a held answer through while the page is busy, so the client reads it in full before the click on the
+    // chip starts the newer load. The old load's continuation queues up behind that click and finds its answer
+    // complete: nothing cancelled it in flight, only the page's own check can drop it.
+    private static Task DeliverAsTheNextFilterStartsAsync(IRenderedComponent<MyShelf> page, HeldAnswer held, string chip) =>
+        page.InvokeAsync(() =>
+        {
+            held.Release();
+            SpinWait.SpinUntil(() => held.Read.IsCompleted, TimeSpan.FromSeconds(5)).Should().BeTrue("the client reads the answer");
+            Thread.Sleep(TimeSpan.FromMilliseconds(100)); // The client parses it and posts the page's continuation.
+            page.FindAll(".chips button").Single(b => HasText(b, chip)).Click();
+        });
 
     private static List<string> Titles(IRenderedComponent<MyShelf> page) => [.. page.FindAll(".item-card__title").Select(t => t.TextContent)];
 

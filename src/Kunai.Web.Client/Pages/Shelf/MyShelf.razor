@@ -1,7 +1,6 @@
 @page "/shelf"
 @attribute [Authorize]
 @implements IDisposable
-@using Microsoft.Kiota.Abstractions
 @inject KunaiApiClient Api
 @inject AuthSession Session
 @inject CatalogMetadata Catalog
@@ -208,34 +207,26 @@
             _nextCursor = page?.NextCursor;
             _totalCount = page?.TotalCount ?? entries.Count;
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException or OperationCanceledException)
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            return; // A newer load replaced this one.
+        }
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
         {
             if (token.IsCancellationRequested)
             {
-                return;
+                return; // The replaced load failed after the newer one started; its error is no longer news.
             }
 
-            // Our token was not cancelled, so a cancellation here is HttpClient's timeout: a network error.
+            // Our token was not cancelled, so a TaskCanceledException here is HttpClient's timeout: a network error.
             _problem = ApiProblem.From(exception);
         }
 
         _loadingMore = false;
-        if (_problem is { Status: 401 })
+        if (_problem is not null)
         {
-            await RefreshSessionAsync();
-        }
-    }
-
-    // The session expired: GET /me answers 401 too, so the router swaps this page for the login redirect.
-    private async Task RefreshSessionAsync()
-    {
-        try
-        {
-            await Session.RefreshAsync();
-        }
-        catch (OperationCanceledException)
-        {
-            // GET /me timed out: the message stays and the next action asks again.
+            // An expired session reloads it: GET /me answers 401 too, so the router swaps this page for the login redirect.
+            await Session.RefreshIfExpiredAsync(_problem);
         }
     }
 

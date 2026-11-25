@@ -1,5 +1,4 @@
 @using System.Globalization
-@using Microsoft.Kiota.Abstractions
 @inject CatalogMetadata Catalog
 
 <ItemCard Href="@($"items/{Entry.Item?.Id}")" Title="@Title" Type="Entry.Item?.Type" Year="Entry.Item?.Year" Subtitle="@Creators" CoverUrl="@Entry.Item?.CoverUrl">
@@ -47,7 +46,7 @@
             {
                 unit = (await Catalog.ForAsync(Entry.Item?.Type))?.ProgressUnit;
             }
-            catch (Exception exception) when (exception is ApiException or HttpRequestException or OperationCanceledException)
+            catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
             {
                 // Without the catalog (unreachable, failing or timed out) the bare number is still useful.
             }
