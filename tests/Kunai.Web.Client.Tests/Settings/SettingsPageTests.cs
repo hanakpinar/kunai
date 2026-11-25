@@ -164,7 +164,7 @@ public sealed class SettingsPageTests : KunaiTestContext
 
     /// <summary>
     /// The form keeps its model (cleared in place): a new one would rebuild the whole form, so the message would arrive
-    /// in a brand-new live region, which screen readers often skip, and the focused button would be replaced.
+    /// in a brand-new live region, which screen readers often skip.
     /// </summary>
     [Fact]
     public void Changing_the_password_shows_the_message_and_clears_the_fields()
