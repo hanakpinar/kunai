@@ -154,8 +154,8 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
 
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1.25rem; }
 
-.item-card { display: flex; flex-direction: column; gap: 0.5rem; }
-.item-card__link { display: grid; gap: 0.5rem; color: var(--text); }
+.item-card { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+.item-card__link { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.5rem; color: var(--text); }
 .item-card__link:hover { text-decoration: none; }
 .item-card__link:hover .cover { transform: translateY(-3px); box-shadow: var(--shadow); }
 .item-card__type { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
@@ -235,7 +235,9 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
 }
 .dialog__header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .dialog__header h2 { margin: 0; }
-.dialog__footer { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+.dialog__footer { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+.dialog__footer .button { white-space: nowrap; }
+.dialog:focus { outline: none; }
 
 /* Pages */
 

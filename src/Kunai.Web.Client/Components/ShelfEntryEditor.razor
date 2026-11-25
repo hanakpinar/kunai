@@ -4,7 +4,7 @@
 @inject AuthSession Session
 
 <div class="dialog-backdrop" @onclick="CancelAsync"></div>
-<section class="dialog" role="dialog" aria-modal="true" aria-labelledby="entry-editor-title">
+<section class="dialog" role="dialog" aria-modal="true" aria-labelledby="entry-editor-title" tabindex="-1" @ref="_dialog" @onkeydown="OnKeyDownAsync">
     <header class="dialog__header">
         <h2 id="entry-editor-title">@Title</h2>
         <button type="button" class="icon-button" aria-label="Kapat" @onclick="CancelAsync">✕</button>
@@ -101,6 +101,7 @@
     private ItemTypeDefinition? _definition;
     private ApiProblem? _problem;
     private ApiProblem? _loadProblem;
+    private ElementReference _dialog;
     private bool _busy;
 
     [Parameter, EditorRequired]
@@ -131,6 +132,18 @@
     private int? MaxProgress => _definition?.ProgressUnit == ProgressUnit.Percent ? 100 : ProgressTotal;
 
     protected override Task OnInitializedAsync() => LoadDefinitionAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Move focus into the modal so keyboard and screen reader users start inside it.
+            await _dialog.FocusAsync();
+        }
+    }
+
+    private Task OnKeyDownAsync(KeyboardEventArgs args) =>
+        string.Equals(args.Key, "Escape", StringComparison.Ordinal) && !_busy ? CancelAsync() : Task.CompletedTask;
 
     private async Task LoadDefinitionAsync()
     {

@@ -7,6 +7,7 @@ using Kunai.Web.Client.Components;
 using Kunai.Web.Client.Infrastructure;
 using Kunai.Web.Client.Tests.Infrastructure;
 
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Kunai.Web.Client.Tests.Shared;
@@ -57,6 +58,21 @@ public sealed class SharedComponentTests : KunaiTestContext
 
         editor.WaitForAssertion(() => session.Me.Should().BeNull("a 401 reloads the session so the router can send the user to sign in"));
         editor.Find(".alert--error").TextContent.Should().Contain("giriş yap");
+    }
+
+    [Fact]
+    public void Escape_closes_the_editor_like_the_close_button()
+    {
+        var cancelled = false;
+        var editor = Render<ShelfEntryEditor>(p => p
+            .Add(x => x.ItemId, ItemId)
+            .Add(x => x.ItemType, ItemType.Book)
+            .Add(x => x.OnCancel, () => cancelled = true));
+        editor.WaitForElement("form");
+
+        editor.Find("select").KeyDown(new KeyboardEventArgs { Key = "Escape" });
+
+        cancelled.Should().BeTrue();
     }
 
     private IRenderedComponent<ShelfEntryEditor> RenderEditor() => Render<ShelfEntryEditor>(p => p
