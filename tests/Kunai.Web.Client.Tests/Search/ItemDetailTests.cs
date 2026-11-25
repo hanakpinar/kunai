@@ -5,14 +5,12 @@ using System.Text.Json.Nodes;
 using Bunit;
 using Bunit.Extensions.WaitForHelpers;
 
-using Kunai.Web.Client.Api;
+using Kunai.Web.Client.Infrastructure;
 using Kunai.Web.Client.Pages.Search.Items;
 using Kunai.Web.Client.Tests.Infrastructure;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Kiota.Abstractions.Authentication;
-using Microsoft.Kiota.Bundle;
 
 namespace Kunai.Web.Client.Tests.Search;
 
@@ -104,7 +102,7 @@ public sealed class ItemDetailTests : KunaiTestContext
     public void An_older_item_that_answers_last_does_not_replace_the_one_now_shown()
     {
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        UseApiThat(holdsBack: $"/api/v1/items/{BookId}", until: release.Task);
+        HoldBack.In(this, Api).Path($"/api/v1/items/{BookId}", release.Task);
         Api.On(HttpMethod.Get, $"/api/v1/items/{BookId}", ItemJson.Book(BookId));
         Api.On(HttpMethod.Get, $"/api/v1/items/{MovieId}", ItemJson.Movie(MovieId));
 
@@ -160,24 +158,29 @@ public sealed class ItemDetailTests : KunaiTestContext
         page.WaitForAssertion(() => page.Find("h1").TextContent.Should().Be("Kürk Mantolu Madonna"));
     }
 
-    /// <summary>Puts a handler in front of the fake API that holds back answers to one path.</summary>
-    private void UseApiThat(string holdsBack, Task until)
+    [Fact]
+    public async Task An_expired_session_turns_the_shelf_panel_into_a_sign_in_link_and_signing_in_loads_it_again()
     {
-        var http = new HttpClient(new HoldBack(holdsBack, until) { InnerHandler = Api }) { BaseAddress = new Uri("https://kunai.test/") };
-        Services.AddSingleton(new KunaiApiClient(new DefaultRequestAdapter(new AnonymousAuthenticationProvider(), httpClient: http) { BaseUrl = "https://kunai.test" }));
-    }
+        SignInAs("ninja");
+        var session = Services.GetRequiredService<AuthSession>();
+        (await session.GetAuthenticationStateAsync()).User.Identity!.IsAuthenticated.Should().BeTrue();
 
-    /// <summary>Answers <paramref name="path"/> only after <paramref name="release"/>, like a slow response already on its way.</summary>
-    private sealed class HoldBack(string path, Task release) : DelegatingHandler
-    {
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            if (string.Equals(request.RequestUri?.AbsolutePath, path, StringComparison.Ordinal))
-            {
-                await release;
-            }
+        // The cookie expired after the session was read.
+        Api.OnProblem(HttpMethod.Get, "/api/v1/me", HttpStatusCode.Unauthorized, "unauthorized");
+        Api.On(HttpMethod.Get, $"/api/v1/items/{BookId}", ItemJson.Book(BookId));
+        Api.OnProblem(HttpMethod.Get, $"/api/v1/me/shelf/{BookId}", HttpStatusCode.Unauthorized, "unauthorized");
+        var page = Render<ItemDetail>(parameters => parameters.Add(p => p.Id, BookId));
 
-            return await base.SendAsync(request, cancellationToken);
-        }
+        page.WaitForAssertion(() => page.Find(".shelf-panel a").GetAttribute("href").Should().Be($"login?returnUrl=items%2F{BookId}"));
+        page.FindAll(".shelf-panel .alert--error").Should().BeEmpty();
+        Api.BodiesSentTo(HttpMethod.Get, "/api/v1/me").Should().HaveCount(2, "the 401 reloads the session");
+
+        // Signing in again (in another tab, say) checks the shelf again instead of keeping the old failure.
+        SignInAs("ninja");
+        Api.OnProblem(HttpMethod.Get, $"/api/v1/me/shelf/{BookId}", HttpStatusCode.NotFound, "not_found");
+        await page.InvokeAsync(session.RefreshAsync);
+
+        page.WaitForAssertion(() => page.Find(".shelf-panel button").TextContent.Should().Be("Rafa ekle"));
+        Api.BodiesSentTo(HttpMethod.Get, $"/api/v1/me/shelf/{BookId}").Should().HaveCount(2);
     }
 }

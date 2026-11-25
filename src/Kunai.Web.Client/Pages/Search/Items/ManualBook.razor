@@ -1,6 +1,5 @@
 @page "/items/new"
 @attribute [Authorize]
-@using Microsoft.Kiota.Abstractions
 @inject KunaiApiClient Api
 @inject AuthSession Session
 @inject NavigationManager Navigation
@@ -98,7 +97,7 @@
             var item = await Api.Api.V1.Items.PostAsync(_form.ToRequest());
             Navigation.NavigateTo($"items/{item?.Id}?added=true");
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
         {
             _problem = ApiProblem.From(exception);
             if (string.Equals(_problem.Code, "book_exists", StringComparison.Ordinal))

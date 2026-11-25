@@ -179,9 +179,13 @@ else
                 Navigation.NavigateTo($"items/{id}", replace: true);
             }
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException or OperationCanceledException)
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
-            // A cancelled token means another item replaced this one: its answer, or failure, no longer matters.
+            // Another item replaced this one, or the user left the page: its answer no longer matters.
+        }
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
+        {
+            // A failure that arrives after another item replaced this one belongs to the old item.
             if (token.IsCancellationRequested)
             {
                 return;
@@ -214,7 +218,7 @@ else
         {
             return (await Catalog.GetAsync())?.Sources?.FirstOrDefault(s => s.Source == source);
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
         {
             return null;
         }

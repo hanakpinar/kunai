@@ -1,9 +1,9 @@
 @page "/items/open"
 @attribute [Authorize]
-@using Microsoft.Kiota.Abstractions
 @inject KunaiApiClient Api
 @inject AuthSession Session
 @inject NavigationManager Navigation
+@implements IDisposable
 
 @* A search hit that is not in the catalog yet links here: import it, then show its page. *@
 
@@ -36,6 +36,7 @@ else
 }
 
 @code {
+    private CancellationTokenSource _cancel = new();
     private ApiProblem? _problem;
     private string? _openedRef;
     private bool _busy;
@@ -43,35 +44,47 @@ else
     [SupplyParameterFromQuery(Name = "ref")]
     public string? Ref { get; set; }
 
-    protected override Task OnParametersSetAsync()
+    protected override async Task OnParametersSetAsync()
     {
-        if (string.IsNullOrWhiteSpace(Ref) || string.Equals(Ref, _openedRef, StringComparison.Ordinal))
+        if (string.Equals(Ref, _openedRef, StringComparison.Ordinal))
         {
-            return Task.CompletedTask;
+            return;
         }
 
+        // Another ref replaced this one (or the link lost it): stop the old import, so its answer cannot
+        // send the page to the wrong item or show a failure that belongs to it.
         _openedRef = Ref;
-        return OpenAsync();
+        _problem = null;
+        await _cancel.CancelAsync();
+        _cancel.Dispose();
+        _cancel = new CancellationTokenSource();
+        if (!string.IsNullOrWhiteSpace(Ref))
+        {
+            await OpenAsync();
+        }
     }
 
     private async Task OpenAsync()
     {
-        var reference = Ref;
+        var token = _cancel.Token;
         _busy = true;
         _problem = null;
         try
         {
             // Safe to repeat: 201 for a new item, 200 when someone imported it already.
-            var item = await Api.Api.V1.Items.Import.PostAsync(new ImportItemRequest { Ref = reference });
-            if (string.Equals(reference, Ref, StringComparison.Ordinal))
+            var item = await Api.Api.V1.Items.Import.PostAsync(new ImportItemRequest { Ref = Ref }, cancellationToken: token);
+            if (!token.IsCancellationRequested)
             {
                 Navigation.NavigateTo($"items/{item?.Id}", replace: true);
             }
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
-            // Another ref replaced this one while it was importing: only its own failure matters.
-            if (string.Equals(reference, Ref, StringComparison.Ordinal))
+            // Another ref replaced this one, or the user left the page: its answer no longer matters.
+        }
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
+        {
+            if (!token.IsCancellationRequested)
             {
                 _problem = ApiProblem.From(exception);
                 await Session.RefreshIfExpiredAsync(_problem);
@@ -79,7 +92,16 @@ else
         }
         finally
         {
-            _busy = false;
+            if (!token.IsCancellationRequested)
+            {
+                _busy = false;
+            }
         }
+    }
+
+    public void Dispose()
+    {
+        _cancel.Cancel();
+        _cancel.Dispose();
     }
 }

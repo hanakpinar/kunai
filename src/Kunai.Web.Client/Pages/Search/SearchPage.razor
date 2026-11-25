@@ -1,6 +1,5 @@
 @page "/search"
 @implements IDisposable
-@using Microsoft.Kiota.Abstractions
 @inject KunaiApiClient Api
 @inject NavigationManager Navigation
 
@@ -209,9 +208,13 @@
 
             _nextCursor = page?.NextCursor;
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException or OperationCanceledException)
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
-            // A cancelled token means a newer search replaced this one: its answer, or failure, no longer matters.
+            // A newer search replaced this one, or the user left the page: its answer no longer matters.
+        }
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
+        {
+            // A failure that arrives after a newer search started belongs to the old one.
             // provider_unavailable / provider_not_configured arrive as 503 with their own Turkish text.
             if (!token.IsCancellationRequested)
             {

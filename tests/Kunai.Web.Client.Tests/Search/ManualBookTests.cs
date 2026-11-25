@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 
 using Bunit;
 
+using Kunai.Web.Client.Infrastructure;
 using Kunai.Web.Client.Pages.Search.Items;
 using Kunai.Web.Client.Tests.Infrastructure;
 
@@ -50,5 +51,28 @@ public sealed class ManualBookTests : KunaiTestContext
 
         page.WaitForAssertion(() => Services.GetRequiredService<NavigationManager>().Uri.Should().Be($"http://localhost/items/{NewId}?added=true"));
         JsonNode.Parse(Api.BodiesSentTo(HttpMethod.Post, "/api/v1/items").Last()!)!["isbn13"].Should().BeNull();
+    }
+
+    [Fact]
+    public async Task An_expired_session_sends_the_user_to_sign_in_and_back_to_the_form()
+    {
+        RunningApp.UseRealAuthorization(this);
+        SignInAs("ninja");
+        var session = Services.GetRequiredService<AuthSession>();
+        (await session.GetAuthenticationStateAsync()).User.Identity!.IsAuthenticated.Should().BeTrue();
+
+        // The cookie expired after the router read the session.
+        Api.OnProblem(HttpMethod.Get, "/api/v1/me", HttpStatusCode.Unauthorized, "unauthorized");
+        Api.OnProblem(HttpMethod.Post, "/api/v1/items", HttpStatusCode.Unauthorized, "unauthorized");
+        var app = RunningApp.Render(this, "items/new");
+        var navigation = Services.GetRequiredService<NavigationManager>();
+
+        app.WaitForElement(".manual-book label:nth-of-type(1) input").Change("Kürk Mantolu Madonna");
+        app.Find(".manual-book form").Submit();
+
+        app.WaitForAssertion(() => navigation.Uri.Should().Be("http://localhost/login?returnUrl=items%2Fnew"));
+        Api.BodiesSentTo(HttpMethod.Post, "/api/v1/items").Should().ContainSingle();
+        Api.BodiesSentTo(HttpMethod.Get, "/api/v1/me").Should().HaveCount(2, "the 401 reloads the session");
+        (await session.GetAuthenticationStateAsync()).User.Identity!.IsAuthenticated.Should().BeFalse();
     }
 }

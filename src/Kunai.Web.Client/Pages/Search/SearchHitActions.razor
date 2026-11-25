@@ -95,7 +95,7 @@ else
                 _editing = true;
             }
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
         {
             _problem = ApiProblem.From(exception);
             await Session.RefreshIfExpiredAsync(_problem);
@@ -131,7 +131,7 @@ else
         {
             return (await Api.Api.V1.Items[itemId].GetAsync())?.ProgressTotal;
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
         {
             return null;
         }

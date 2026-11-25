@@ -69,11 +69,12 @@ public sealed class SearchPageTests : KunaiTestContext
     public void Changing_the_type_drops_the_old_hits_and_searches_from_the_first_page()
     {
         Api.AnswerAsynchronously = true;
-        Api.On(HttpMethod.Get, SearchPath, new
+        var book = new
         {
             items = new[] { new { @ref = "openLibrary:OL893415W", id = (Guid?)null, type = "book", title = "Dune", year = 1965, subtitle = "Frank Herbert", coverUrl = (string?)null } },
             nextCursor = "page-2",
-        });
+        };
+        Api.On(HttpMethod.Get, SearchPath, book);
         var page = RenderSearch("search?q=dune&type=book");
         page.WaitForAssertion(() => page.Find(".item-card__type").TextContent.Should().Be("Kitap"));
 
@@ -92,6 +93,14 @@ public sealed class SearchPageTests : KunaiTestContext
         var searches = SearchRequests();
         searches.Should().HaveCount(2);
         searches[1].Should().ContainEquivalentOf("type=movie").And.ContainEquivalentOf("q=dune").And.NotContainEquivalentOf("cursor");
+
+        // Back to books: the same hit shows again, it was only a repeat within the old search.
+        Api.On(HttpMethod.Get, SearchPath, book);
+        Services.GetRequiredService<NavigationManager>().NavigateTo("search?q=dune&type=book");
+
+        page.WaitForAssertion(() => page.FindAll(".item-card__title").Select(t => t.TextContent).Should().Equal("Dune"));
+        page.Find(".item-card__type").TextContent.Should().Be("Kitap");
+        SearchRequests().Should().HaveCount(3);
     }
 
     [Fact]

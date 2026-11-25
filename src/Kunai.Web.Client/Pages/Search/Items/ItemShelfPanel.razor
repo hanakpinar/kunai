@@ -111,7 +111,7 @@
             // Not on the shelf yet.
             _entry = null;
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
         {
             _problem = ApiProblem.From(exception);
             await Session.RefreshIfExpiredAsync(_problem);
@@ -129,7 +129,7 @@
         {
             return (await Catalog.ForAsync(Item.Type))?.ProgressUnit;
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
         {
             return null;
         }
