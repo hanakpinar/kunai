@@ -4,7 +4,7 @@
 
 Kunai is a personal media tracker: books, movies, TV series, games, anime and manga on one shelf, with a public profile, yearly goals ("missions") and a ninja belt that grows as you finish things.
 
-This repository contains the **HTTP API** that the web app and the native mobile apps use.
+This repository contains the **HTTP API** that the web app and the native mobile apps use, and the **web app** (Blazor WebAssembly, Turkish UI).
 
 ## Features
 
@@ -14,6 +14,7 @@ This repository contains the **HTTP API** that the web app and the native mobile
 - **Shelf:** statuses per type (want to read, reading, read, on hold, dropped...), rating, dates, progress, review, favorites; ETags against lost updates; filters, sorting and cursor paging.
 - **Profiles:** public or private profile, counts, this year's completions, favorites, yearly stats, missions, seven belts from white to black, twelve built-in ninja avatars painted with the belt color.
 - **Localization:** status labels and emails in Turkish and English; dates in the user's time zone.
+- **Web app:** search and add to the shelf in two clicks, item pages, a filterable shelf, public profiles with stats, missions and belts, account settings with the avatar picker.
 
 ## Tech stack
 
@@ -23,11 +24,12 @@ This repository contains the **HTTP API** that the web app and the native mobile
 | API | ASP.NET Core Minimal APIs, vertical slices, built-in validation, RFC 9457 problem details |
 | Data | PostgreSQL 18, EF Core 10 (Npgsql), HybridCache |
 | Identity | ASP.NET Core Identity, cookie + JWT (ES256) with server-side sessions |
-| Docs | OpenAPI 3.1 (`/openapi/v1.json`), Scalar (`/docs`) |
+| Docs | OpenAPI 3.1 (`/openapi/v1.json`), Scalar (`/docs`); the contract is committed in `openapi/` |
+| Web | Blazor Web App (interactive WebAssembly), YARP same-origin proxy, Kiota-generated typed client |
 | Resilience | Microsoft.Extensions.Http.Resilience per provider, client-side rate limits |
-| Local orchestration | Aspire 17: Postgres, pgAdmin, Mailpit, the API |
+| Local orchestration | Aspire 17: Postgres, pgAdmin, Mailpit, the API, the web app |
 | Observability | OpenTelemetry logs, traces and metrics; health checks |
-| Tests | xUnit v3 on Microsoft Testing Platform, AwesomeAssertions, Testcontainers (PostgreSQL), WireMock.Net, ArchUnitNET |
+| Tests | xUnit v3 on Microsoft Testing Platform, AwesomeAssertions, Testcontainers (PostgreSQL), WireMock.Net, ArchUnitNET, bUnit |
 | Quality gates | Nullable, warnings as errors, .NET analyzers + Meziantou, central package management, NuGet audit, `dotnet format` |
 | CI | GitHub Actions, Dependabot |
 
@@ -35,7 +37,8 @@ This repository contains the **HTTP API** that the web app and the native mobile
 
 ```mermaid
 flowchart LR
-    web[Web app] -- cookie + X-CSRF --> api
+    browser[Browser: Blazor WebAssembly] -- cookie + X-CSRF --> web[Kunai.Web: static files + YARP /api proxy]
+    web --> api
     mobile[Mobile apps] -- bearer JWT --> api
     subgraph api[Kunai.Api]
         identity[Identity] --- catalog[Catalog]
@@ -62,7 +65,7 @@ Prerequisites: .NET SDK 10.0.404 or newer (pinned in `global.json`) and Docker r
 dotnet run --project src/Kunai.AppHost
 ```
 
-This starts PostgreSQL, pgAdmin, Mailpit and the API, applies migrations and prints a link to the Aspire dashboard. From the dashboard, open the API's `/docs` for the interactive reference and Mailpit to read the confirmation emails.
+This starts PostgreSQL, pgAdmin, Mailpit, the API and the web app, applies migrations and prints a link to the Aspire dashboard. From the dashboard, open the **web** endpoint to use the app, the API's `/docs` for the interactive reference and Mailpit to read the confirmation emails (their links open the web app).
 
 ### Provider keys (optional locally)
 
@@ -96,7 +99,19 @@ Per-IP rate limits need the real client address. List the proxies allowed to sen
 dotnet test
 ```
 
-Integration tests start their own PostgreSQL container and stub every provider with WireMock, so Docker must be running; no keys are needed.
+Integration tests start their own PostgreSQL container and stub every provider with WireMock, so Docker must be running; no keys are needed. Web component tests render pages with bUnit against a fake API; web host tests run the host with WireMock in place of the API. Neither needs Docker.
+
+### Changing the API contract
+
+The API's OpenAPI document is committed as `openapi/kunai.v1.json`, and a test fails when the running API no longer matches it. After an intentional change, update the file and regenerate the web client:
+
+```bash
+KUNAI_UPDATE_OPENAPI=1 dotnet test --project tests/Kunai.Api.IntegrationTests
+```
+
+```bash
+scripts/generate-web-client.sh
+```
 
 ## Repository layout
 
@@ -104,6 +119,12 @@ Integration tests start their own PostgreSQL container and stub every provider w
 src/
   Kunai.AppHost/          Aspire orchestration for local development
   Kunai.ServiceDefaults/  OpenTelemetry, health checks, service discovery
+  Kunai.Web/              Web host: serves the WebAssembly app, proxies /api to the API
+  Kunai.Web.Client/       The Blazor WebAssembly app
+    Api/                  Generated typed client (do not edit)
+    Infrastructure/       Session, CSRF header, item-type metadata, Turkish error messages
+    Components/           Shared UI: cards, badges, avatar, shelf entry dialog
+    Pages/                Account, Search (+ items), Shelf, Profile, Settings
   Kunai.Api/
     Common/               Feature-agnostic plumbing: results, problem details, rate limits, email
     Persistence/          AppDbContext and migrations
@@ -117,6 +138,10 @@ tests/
   Kunai.Api.UnitTests/          Domain rules
   Kunai.Api.IntegrationTests/   HTTP tests against a real database
   Kunai.ArchitectureTests/      Dependency rules
+  Kunai.Web.Client.Tests/       bUnit component tests over a fake API
+  Kunai.Web.Tests/              Web host: every page loads directly, /api is proxied untouched
+openapi/                  Committed OpenAPI contract
+scripts/                  Client generation
 docs/
   adr/                    Architecture decision records
   errors.md               Error code catalogue

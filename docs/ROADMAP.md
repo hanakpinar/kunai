@@ -1,4 +1,4 @@
-# Kunai API roadmap
+# Kunai roadmap
 
 Each step ends with a green build, passing tests and its own commit, so the repository is always in a working state.
 If work stops midway, continue from the first unchecked step.
@@ -17,15 +17,25 @@ If work stops midway, continue from the first unchecked step.
 | 10 | Independent review and fixes | ✅ done |
 | 11 | Documentation (README, ADRs, error catalogue, client integration guide) | ✅ done |
 
+## Web app
+
+| # | Step | Status |
+|---|---|---|
+| W1 | Blazor Web App host with a YARP proxy to the API, wired into Aspire | ✅ done |
+| W2 | Committed OpenAPI contract, contract test and the Kiota-generated client | ✅ done |
+| W3 | Session, layout, design system, shared components, bUnit test harness | ✅ done |
+| W4 | Account pages: sign-in, registration, email confirmation, password reset | ✅ done |
+| W5 | Search and item pages, manual books, shelf, public profile (stats, missions, belts), settings | ✅ done |
+
 ## Next
 
 | Step | Notes |
 |---|---|
-| Publish the repository on GitHub | CI and Dependabot start working once it is pushed |
-| Hosted environment | The container image is ready (`dotnet publish -t:PublishContainer`); needs a host (e.g. Azure Container Apps + Neon), a signing key, SMTP and a domain |
+| Hosted environment | Container images for the API and the web host; needs a host (e.g. Azure Container Apps + Neon), a signing key, SMTP and a domain |
 | Metadata refresh job | Re-sync imported items periodically (TMDB asks for cached data to be refreshed) |
-| OpenAPI breaking-change check in CI | Commit the generated document and diff it on pull requests (oasdiff) |
-| Web app | Blazor Web App calling the API through a client generated from the OpenAPI document |
+| OpenAPI breaking-change check in CI | The contract is committed and tested; add an oasdiff check on pull requests |
+| Browser end-to-end tests | Playwright against the Aspire app host |
+| Prerender public profiles | Only if search engines should see `/u/{username}` |
 
 ## Deferred on purpose
 

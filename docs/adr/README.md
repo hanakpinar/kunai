@@ -11,3 +11,4 @@ Short records of the decisions that shape the codebase: the context, the choice 
 | [0005](0005-import-on-demand.md) | Import metadata on demand from providers |
 | [0006](0006-errors-and-status-codes.md) | Problem details with stable codes; 400 versus 422 |
 | [0007](0007-keyset-pagination.md) | Cursor (keyset) pagination everywhere |
+| [0008](0008-blazor-wasm-behind-yarp.md) | Blazor WebAssembly behind a same-origin proxy, with a generated client |
