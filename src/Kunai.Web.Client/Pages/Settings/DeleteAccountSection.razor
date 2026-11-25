@@ -38,17 +38,10 @@
             return;
         }
 
-        // Leave the signed-in area first: signed out on /settings, the router would send the user to the sign-in page.
-        // Home needs no session, so forgetting it there only changes the header.
-        Navigation.NavigateTo(string.Empty, replace: true);
-        try
-        {
-            // The API has already ended the session; this clears the cookie and the local state too.
-            await Session.LogoutAsync();
-        }
-        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
-        {
-            // Offline right after the deletion: the next GET /me finds no session anyway.
-        }
+        // DELETE /me has already ended the cookie session. Start the app again on the home page instead of signing out
+        // in place: in place, the router would either send /settings to the sign-in page or show the deleted account's
+        // signed-in home (and its shelf calls) until the session caught up. A fresh load asks GET /me, gets a 401 and
+        // opens signed out; replacing the entry keeps Back from returning to the settings of an account that is gone.
+        Navigation.NavigateTo(string.Empty, forceLoad: true, replace: true);
     }
 }

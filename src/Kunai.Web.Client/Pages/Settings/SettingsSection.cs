@@ -1,11 +1,8 @@
-using System.Net;
-
 using Kunai.Web.Client.Api;
 using Kunai.Web.Client.Api.Models;
 using Kunai.Web.Client.Infrastructure;
 
 using Microsoft.AspNetCore.Components;
-using Microsoft.Kiota.Abstractions;
 
 namespace Kunai.Web.Client.Pages.Settings;
 
@@ -64,7 +61,10 @@ public abstract class SettingsSection : ComponentBase
         }
 
         Success = success;
-        await RefreshSessionAsync();
+
+        // A lost connection or a timeout keeps the current user (AuthSession does not throw for them): the header
+        // catches up on the next page load.
+        await Session.RefreshAsync();
         return true;
     }
 
@@ -80,7 +80,7 @@ public abstract class SettingsSection : ComponentBase
         {
             await request();
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
         {
             problem = ApiProblem.From(exception);
         }
@@ -95,12 +95,9 @@ public abstract class SettingsSection : ComponentBase
         }
 
         Problem = problem;
-        if (problem.Status == (int)HttpStatusCode.Unauthorized)
-        {
-            // The session ended (signed out in another tab, expired): once the session knows, the router asks for a sign-in.
-            await RefreshSessionAsync();
-        }
 
+        // On a 401 (signed out in another tab, expired): once the session knows, the router asks for a sign-in.
+        await Session.RefreshIfExpiredAsync(problem);
         return false;
     }
 
@@ -109,16 +106,4 @@ public abstract class SettingsSection : ComponentBase
         Problem is { Fields.Count: > 0 } problem && problem.Fields.Keys.All(field => inlineFields.Contains(field, StringComparer.Ordinal))
             ? null
             : Problem;
-
-    private async Task RefreshSessionAsync()
-    {
-        try
-        {
-            await Session.RefreshAsync();
-        }
-        catch (TaskCanceledException)
-        {
-            // GET /me timed out (other network errors keep the current user): the header catches up on the next page load.
-        }
-    }
 }

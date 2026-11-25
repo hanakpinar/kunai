@@ -1,7 +1,5 @@
 @page "/settings"
 @attribute [Authorize]
-@using System.Net
-@using Microsoft.Kiota.Abstractions
 @inject KunaiApiClient Api
 @inject AuthSession Session
 
@@ -60,7 +58,7 @@
         {
             _me = await Api.Api.V1.Me.GetAsync();
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
+        catch (Exception exception) when (ApiProblem.IsApiFailure(exception))
         {
             _problem = ApiProblem.From(exception);
         }
@@ -69,22 +67,10 @@
             _loading = false;
         }
 
-        if (_problem?.Status == (int)HttpStatusCode.Unauthorized)
+        if (_problem is not null)
         {
-            await RefreshSessionAsync();
-        }
-    }
-
-    /// <summary>After a 401 (signed out in another tab, expired): once the session knows, the router asks for a sign-in.</summary>
-    private async Task RefreshSessionAsync()
-    {
-        try
-        {
-            await Session.RefreshAsync();
-        }
-        catch (TaskCanceledException)
-        {
-            // GET /me timed out; the error above stays on the page.
+            // On a 401 (signed out in another tab, expired): once the session knows, the router asks for a sign-in.
+            await Session.RefreshIfExpiredAsync(_problem);
         }
     }
 }

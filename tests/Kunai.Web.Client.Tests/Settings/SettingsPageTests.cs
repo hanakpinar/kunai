@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 
 using Bunit;
+using Bunit.TestDoubles;
 
 using Kunai.Web.Client.Infrastructure;
 using Kunai.Web.Client.Pages.Settings;
@@ -18,6 +19,7 @@ public sealed class SettingsPageTests : KunaiTestContext
     private const string Me = "/api/v1/me";
     private const string SettingsPath = "/api/v1/me/settings";
     private const string ProfilePath = "/api/v1/me/profile";
+    private const string PasswordPath = "/api/v1/me/password";
     private const string LogoutPath = "/api/v1/auth/logout";
     private const string Preferences = "section[aria-labelledby=settings-preferences]";
     private const string SignInRedirect = "http://localhost/login?returnUrl=settings";
@@ -144,7 +146,7 @@ public sealed class SettingsPageTests : KunaiTestContext
         Api.On(HttpMethod.Get, Me, Account());
         Api.OnProblem(
             HttpMethod.Post,
-            "/api/v1/me/password",
+            PasswordPath,
             HttpStatusCode.BadRequest,
             "validation_failed",
             new Dictionary<string, string[]>(StringComparer.Ordinal) { ["currentPassword"] = ["password_mismatch"] });
@@ -157,7 +159,36 @@ public sealed class SettingsPageTests : KunaiTestContext
         page.Find("section[aria-labelledby=settings-password] form").Submit();
 
         page.WaitForAssertion(() => page.Find("section[aria-labelledby=settings-password] .validation-message").TextContent.Should().Be("Şifre yanlış."));
-        Api.BodiesSentTo(HttpMethod.Post, "/api/v1/me/password").Single().Should().Contain("\"currentPassword\":\"not my password\"");
+        Api.BodiesSentTo(HttpMethod.Post, PasswordPath).Single().Should().Contain("\"currentPassword\":\"not my password\"");
+    }
+
+    /// <summary>
+    /// The form keeps its model (cleared in place): a new one would rebuild the whole form, so the message would arrive
+    /// in a brand-new live region, which screen readers often skip, and the focused button would be replaced.
+    /// </summary>
+    [Fact]
+    public void Changing_the_password_shows_the_message_and_clears_the_fields()
+    {
+        Api.On(HttpMethod.Get, Me, Account());
+        Api.On(HttpMethod.Post, PasswordPath, null, HttpStatusCode.NoContent);
+        var page = Render<SettingsPage>();
+
+        const string Section = "section[aria-labelledby=settings-password]";
+        const string Passwords = $"{Section} input[type=password]";
+        page.WaitForElements(Passwords)[0].Change("my old password");
+        var feedback = page.FindComponent<PasswordSection>().FindComponent<SectionFeedback>().Instance;
+        page.FindAll(Passwords)[1].Change("a long new passphrase");
+        page.FindAll(Passwords)[2].Change("a long new passphrase");
+        page.Find($"{Section} form").Submit();
+
+        page.WaitForAssertion(() => page.Find($"{Section} p[role=status]").TextContent.Should().Be("Şifren değişti. Diğer cihazlardaki oturumların kapatıldı."));
+        page.Find($"{Section} p[role=status]").ClassList.Should().Contain("alert--success");
+        page.FindAll(Passwords).Should().HaveCount(3).And.OnlyContain(input => string.IsNullOrEmpty(input.GetAttribute("value")));
+        page.FindComponent<PasswordSection>().FindComponent<SectionFeedback>().Instance.Should()
+            .BeSameAs(feedback, "the status region that announces the change must be the one that was already on the page");
+        using var sent = JsonDocument.Parse(Api.BodiesSentTo(HttpMethod.Post, PasswordPath).Single()!);
+        sent.RootElement.GetProperty("currentPassword").GetString().Should().Be("my old password");
+        sent.RootElement.GetProperty("newPassword").GetString().Should().Be("a long new passphrase");
     }
 
     [Fact]
@@ -238,35 +269,32 @@ public sealed class SettingsPageTests : KunaiTestContext
     }
 
     [Fact]
-    public void Deleting_the_account_needs_the_checkbox_then_goes_home_and_signs_out()
+    public async Task Deleting_the_account_needs_the_checkbox_then_reloads_the_app_on_home()
     {
         Api.AnswerAsynchronously = true;
         Api.On(HttpMethod.Get, Me, Account());
         Api.On(HttpMethod.Delete, Me, null, HttpStatusCode.NoContent);
-        Api.On(HttpMethod.Post, LogoutPath, null, HttpStatusCode.NoContent);
-        var session = Services.GetRequiredService<AuthSession>();
-        var navigation = Services.GetRequiredService<NavigationManager>();
+        var navigation = Services.GetRequiredService<BunitNavigationManager>();
         var app = RenderApp("settings");
-        var visited = new List<string>();
-        navigation.LocationChanged += (_, e) => visited.Add(navigation.ToBaseRelativePath(e.Location));
 
-        var delete = app.WaitForElement("section[aria-labelledby=settings-delete] button[type=submit]");
-        delete.HasAttribute("disabled").Should().BeTrue("the user has not confirmed yet");
-        session.Me.Should().NotBeNull("the router loaded the signed-in session");
+        const string Section = "section[aria-labelledby=settings-delete]";
+        app.WaitForElement($"{Section} button[type=submit]").HasAttribute("disabled").Should().BeTrue("the user has not confirmed yet");
 
-        app.Find("section[aria-labelledby=settings-delete] input[type=password]").Change("my password!!");
-        app.Find("section[aria-labelledby=settings-delete] input[type=checkbox]").Change(true);
-        app.Find("section[aria-labelledby=settings-delete] button[type=submit]").HasAttribute("disabled").Should().BeFalse();
-        Api.OnProblem(HttpMethod.Get, Me, HttpStatusCode.Unauthorized, "unauthorized");
-        app.Find("section[aria-labelledby=settings-delete] form").Submit();
+        // Awaited: while an answer's continuation still holds the renderer (asynchronous answers), the synchronous
+        // Change only queues the event, so the button could be read before the checkbox reached the form.
+        await app.Find($"{Section} input[type=password]").ChangeAsync(new ChangeEventArgs { Value = "my password!!" });
+        await app.Find($"{Section} input[type=checkbox]").ChangeAsync(new ChangeEventArgs { Value = true });
+        app.Find($"{Section} button[type=submit]").HasAttribute("disabled").Should().BeFalse();
+        await app.Find($"{Section} form").SubmitAsync();
 
-        app.WaitForAssertion(() => Api.Requests.Should().Contain(r => r.Method == HttpMethod.Post && string.Equals(r.PathAndQuery, LogoutPath, StringComparison.Ordinal)));
-        app.WaitForAssertion(() => session.Me.Should().BeNull());
-        app.WaitForElement(".hero");
         Api.BodiesSentTo(HttpMethod.Delete, Me).Single().Should().Contain("\"password\":\"my password!!\"");
-        navigation.Uri.Should().Be("http://localhost/");
-        visited.Should().ContainSingle("home needs no session, so signing out there never detours through the sign-in page")
-            .Which.Should().BeEmpty();
+        var reload = navigation.History.First();
+        reload.Uri.Should().BeEmpty("the app starts again on the home page");
+        reload.Options.ForceLoad.Should().BeTrue("a fresh app finds no session instead of showing the deleted account in the meantime");
+        reload.Options.ReplaceHistoryEntry.Should().BeTrue("Back must not return to the settings of a deleted account");
+        Api.Requests.Should().NotContain(
+            request => request.Method == HttpMethod.Post && string.Equals(request.PathAndQuery, LogoutPath, StringComparison.Ordinal),
+            "DELETE /me already ended the session; signing out in place would only delay the reload");
     }
 
     /// <summary>GET /me as the API sends it: camelCase, every field present.</summary>
