@@ -485,3 +485,19 @@ $RECYCLE.BIN/
 # Claude Code: local worktrees and personal settings
 .claude/worktrees/
 .claude/settings.local.json
+
+# Ruflo local secrets and runtime data
+.env.local
+.env.*.local
+.claude-flow/data/
+.claude-flow/logs/
+.claude-flow/sessions/
+.claude-flow/metrics/
+.claude-flow/policy/
+.claude-flow/security/
+.claude-flow/mods/
+.claude-flow/embeddings.json
+.claude-flow/memory-package.json
+.claude-flow/harness-active-policy.json
+.claude/settings.json.bak-*
+.swarm/
